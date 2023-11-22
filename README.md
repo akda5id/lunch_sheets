@@ -8,7 +8,9 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 ### Install:
 * Open the sheet you would like to use the tools in. Choose "Apps Script" from the Extensions menu. That will open a code editing page, if you don't have any existing Apps Scripts, it will be an empty function called "myFunction" in a file called Code.gs. Delete that empty function, and copy and paste everything [from Code.js in this repo](https://raw.githubusercontent.com/akda5id/lunch_sheets/main/Code.js) into your Code.gs.
 * If you do have other code in there, you can create a new file, and put this code into it. Heads up if you are using a custom menu, or otherwise using onLoad, there will be only be one onLoad called, so you will have to sort that out (put my onLoad code into yours, probably.)
-* Give the project a name (change "Untitled Project" to "Lunch Money Script", or whatever you want), then click the save icon, and close the window. Reload your spreadsheet and you should see a menu "Lunch Money" appear. Choose the "Set API Key" option. You will get a permission warning at this point. Click through that, it's saying that you are giving yourself permission to access your own data. On the "Google hasn’t verified this app" page, click "advanced", then "Go to…". After that completes, choose "Set API Key" again, to actually do it. Then put in your API key ([get one here](https://my.lunchmoney.app/developers)) at the prompt.
+* Give the project a name (change "Untitled Project" to "Lunch Money Script", or whatever you want), then click the save icon, and close the window. 
+* Reload your spreadsheet and you should see a menu "Lunch Money" appear. Choose the "Set API Key" option. You will get a permission warning at this point. Click through that, it's saying that you are giving yourself permission to access your own data. On the "Google hasn’t verified this app" page, click "advanced", then "Go to…". 
+* After that completes, choose "Set API Key" again, to actually do it. Then put in your API key ([get one here](https://my.lunchmoney.app/developers)) at the prompt.
 
 ### Usage:
 * Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions from the first transaction date you enter. After the first run it will check for updated transactions in the 60 days before your last transaction currently in the sheet, and add new ones up until today to the end of the sheet.
@@ -17,8 +19,9 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 ### Settings:
 In the Lunch Money menu, there is an option to "Update Categories". Run this if you change the name, grouping, or hide from budget, income, etc. of categories. I cache them between runs as I don't expect them to change often, so it's a manual update. Note that if you do adjust them, it will only update for transactions in LookbackDays (see below). If you want to rerun on all transactions, just delete or rename the LM-Transactions-All sheet.
 
-There are a few things at the top of [Code.gs](https://github.com/akda5id/lunch_sheets/blob/main/Code.js) that you can adjust:
-LMdebug: write tracing info to the apps script log, if you are having trouble with the script, this might help us figure out what's going on.
+There are a few things at the top of [Code.gs](Code.js) that you can adjust:
+
+LMdebug: Write tracing info to the apps script log, if you are having trouble with the script, this might help us figure out what's going on.
 
 jumpOnFinish: If you want it to take you to the end of a sheet after an update is run. False will leave you wherever you were when you ran the update.
 
@@ -29,7 +32,7 @@ LMTransactionsLookback: Max number of transactions you would ever get from today
 LMPendingLookback: Number of transactions back from the current last one, to check for pending transactions that need to be updated. Probably just leave this at 300, no reason to make it less, it's fast. If for some reason you have lots of transactions that stay as pending and never update, then it would become a problem.
 
 ### Help:
-* Check to see if I have created a thread in the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1134594318414389258), you can bug me there I guess.
+Check to see if I have created a thread in the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1134594318414389258), you can bug me there I guess.
 
 ### Random Notes:
 * API key is per spreadsheet, so you can use separate "budgets" if you want, as long as you don't need them in the same spreadsheet.
@@ -43,12 +46,12 @@ LMPendingLookback: Number of transactions back from the current last one, to che
 ### Security and Privacy Notes:
 I only call the Lunch Money API, but the security warning you get when you first run the script warns about "Create[ing] a network connection to any external service". If you would like to make sure that I can't slip anything sneaky past you, you can add these lines to your [manifest](https://developers.google.com/apps-script/concepts/manifests):
 
-`"oauthScopes": [
-  "https://www.googleapis.com/auth/script.external_request",
-  "https://www.googleapis.com/auth/spreadsheets.currentonly"
-],
-"urlFetchWhitelist": [
-  "https://dev.lunchmoney.app/"
-],`
+	"oauthScopes": [
+  		"https://www.googleapis.com/auth/script.external_request",
+  		"https://www.googleapis.com/auth/spreadsheets.currentonly"
+	],
+		"urlFetchWhitelist": [
+  		"https://dev.lunchmoney.app/"
+	],
 
 This is not necessary, only helps if I turn evil, and you manually update the script to my new evil version, since there is no auto update functionality.
