@@ -4,23 +4,40 @@
 "use strict";
 
 function onOpen() {
- var menu = [{name: "Load Transactions", functionName: "updateTransactionsAll"},{name: "Update Categories", functionName: "updateCatagories"},{name: "Set API Key", functionName: "setApiKey"}];
+ var menu = [{name: "Load Transactions", functionName: "updateTransactionsAll"},null,{name: "Update Categories", functionName: "updateCatagories"},{name: "Set API Key", functionName: "setApiKey"}];
  SpreadsheetApp.getActiveSpreadsheet().addMenu("Lunch Money", menu);
 }
 
-const debug = true;
-const jumpOnFinish = true //should we jump to the last row when we finish updating a sheet?
+/**
+ *  SETTINGS:
+ */
+const LMdebug = true;         //write tracing info to the apps script log
+
+const jumpOnFinish = true;    //should we jump to the last row when we finish updating a sheet?
+
+const LMTransactionsLookbackDays = 60 //number of days back from the current last one, to check for updated
+                                      //category, etc. This one you should keep tight if you can, it's a bit slow.
+
+var LMTransactionsLookback = 1000     //Max number of transactions you would ever get from today to LMTransactionsLookbackDays.
+                                      //Be generous, it's fast. If you start getting sets of old transactions added at the end of
+                                      //your sheet, this is where the problem is, make it bigger.
+
+var LMPendingLookback = 300;  //number of transactions back from the current last one, to check 
+                              //for pending transactions that need to be updated. Be generous, it's fast.
+/**
+ *  END OF SETTINGS
+ */
 
 const documentProperties = PropertiesService.getDocumentProperties();
 const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-var transactionsAllSheet = null
-var transactionsAllLastRow = null
-var transactionAllIds = null
-var transactionAllIdsStart = null
+var transactionsAllSheet = null;
+var transactionsAllLastRow = null;
+var transactionAllIds = null;
+var transactionAllIdsStart = null;
 
 function updateTransactionsAll() {
-  transactionAllIds = null
-  transactionAllIdsStart = null
+  transactionAllIds = null;
+  transactionAllIdsStart = null;
   transactionsAllSheet = activeSpreadsheet.getSheetByName("LM-Transactions-All");
   if (transactionsAllSheet == null) {
     let firstTransactionDate = displayPrompt("date of first transaction in yyyy-MM-dd format").getResponseText();
@@ -36,7 +53,7 @@ function updateTransactionsAll() {
     transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
     checkPendings(LMCategories, plaidAccountNames, assetAccountNames);
-    let {startDate, endDate} = calulateRelitiveDates(60);
+    let {startDate, endDate} = calulateRelitiveDates(LMTransactionsLookbackDays);
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let parsedTransactions = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
@@ -55,14 +72,14 @@ function updateTransactionsAll() {
 
 function checkPendings(LMCategories, plaidAccountNames, assetAccountNames) {
   // if not coming from updateTransactionsAll, make sure transactionsAllSheet and transactionsAllLastRow are set
-  let offset = 300;
-  var start = transactionsAllLastRow - offset;
+  var start = transactionsAllLastRow - LMPendingLookback;
   if (start < 1) {
     start = 1;
+    LMPendingLookback = transactionsAllLastRow + 1;
   }
   let search = 'pending';
-  var data = transactionsAllSheet.getRange(start, 9, offset).getValues();
-  var ids = transactionsAllSheet.getRange(start, 1, offset).getValues();
+  var data = transactionsAllSheet.getRange(start, 9, LMPendingLookback).getValues();
+  var ids = transactionsAllSheet.getRange(start, 1, LMPendingLookback).getValues();
   while (true) {
     let index = data.findIndex(foo => {return foo[0] == search});
     if (index < 0) {break;}
@@ -77,12 +94,12 @@ function checkPendings(LMCategories, plaidAccountNames, assetAccountNames) {
 
 function findIdTransactionsAll(id){
   if (transactionAllIds == null) {
-    let offset = 1000;
-    transactionAllIdsStart = transactionsAllLastRow - offset;
+    transactionAllIdsStart = transactionsAllLastRow - LMTransactionsLookback;
     if (transactionAllIdsStart < 1) {
       transactionAllIdsStart = 1;
+      LMTransactionsLookback = transactionsAllLastRow + 1;
     }
-    transactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, offset).getValues();
+    transactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, LMTransactionsLookback).getValues();
   }
 
   let row = transactionAllIds.findIndex(foo => {return foo[0] == id});
@@ -107,7 +124,7 @@ function findCat(LMCategories, catId) {
 }
 
 function apiRequest(url) {
-  if (debug) {Logger.log('apiRequest for %s', url);}
+  if (LMdebug) {Logger.log('apiRequest for %s', url);}
   try {
     var LMKey = documentProperties.getProperty('LMKey');
     if (typeof LMKey !== 'string' || LMKey == '') {
@@ -115,7 +132,7 @@ function apiRequest(url) {
       return false;
     }
   } catch (err) {
-    if (debug) {Logger.log('Failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('Failed with error %s', err.message);}
     displayToastAlert("Can't find API key, make sure you have saved it");
     return false;
   }
@@ -131,19 +148,19 @@ function apiRequest(url) {
     return JSON.parse(response.getContentText());
   } catch (f) {
     displayToastAlert('API access failed');
-    if (debug) {Logger.log('URLfetch with error %s', f.message);}
+    if (LMdebug) {Logger.log('URLfetch with error %s', f.message);}
     return false;
   }
 }
 
 function calulateRelitiveDates(lookback) {
-  var startDate = new Date();
+  let lastDate = transactionsAllSheet.getRange(transactionsAllLastRow, 2, 1).getValue();
+  var startDate = new Date(lastDate);
   var endDate = new Date();
   startDate.setDate(startDate.getDate() - lookback);
   endDate.setDate(endDate.getDate() + 2);
   startDate = Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd");
   endDate = Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd");
-  
   return {startDate, endDate}
 }
 
@@ -155,7 +172,7 @@ function loadTransactions(startDate, endDate) {
       if (result.transactions.length > 0) {
         return result.transactions;
       } else {
-        if (debug) {Logger.log('loadTransactions empty for %s', url);}
+        if (LMdebug) {Logger.log('loadTransactions empty for %s', url);}
         displayToastAlert("transactions seem empty for those dates");
         return false
       }
@@ -163,8 +180,8 @@ function loadTransactions(startDate, endDate) {
       return false;
     }
   } catch (err) {
-    if (debug) {Logger.log('result %s', result);}
-    if (debug) {Logger.log('loadTransactions failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('result %s', result);}
+    if (LMdebug) {Logger.log('loadTransactions failed with error %s', err.message);}
     displayToastAlert("unable to retrieve transactions");
     return false
   }
@@ -244,7 +261,7 @@ function loadCategoriesAndAccounts() {
       }
     }
   } catch (err) {
-    if (debug) {Logger.log('plaidAccountNames failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('plaidAccountNames failed with error %s', err.message);}
     throw new Error('failed to load LMPlaidAccountNames 2');
   }
 
@@ -257,7 +274,7 @@ function loadCategoriesAndAccounts() {
       }
     }
   } catch (err) {
-    if (debug) {Logger.log('assetAccountNames failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('assetAccountNames failed with error %s', err.message);}
     throw new Error('failed to load LMAssetAccountNames 2');
   }
   
@@ -267,7 +284,7 @@ function loadCategoriesAndAccounts() {
       LMCategories = updateCatagories();
     }
   } catch (err) {
-    if (debug) {Logger.log('categories failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('categories failed with error %s', err.message);}
     return false;
   }
 
@@ -293,7 +310,7 @@ function updatePlaidAccountNames() {
   try {
     documentProperties.setProperty('LMPlaidAccountNames', JSON.stringify(plaidAccountNames));
   } catch (err) {
-    if (debug) {Logger.log('Saving LMPlaidAccountNames failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('Saving LMPlaidAccountNames failed with error %s', err.message);}
     return false
   }
   return plaidAccountNames
@@ -317,7 +334,7 @@ function updateAssetAccountNames() {
   try {
     documentProperties.setProperty('LMAssetAccountNames', JSON.stringify(assetAccountNames));
   } catch (err) {
-    if (debug) {Logger.log('Saving LMAssetAccountNames failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('Saving LMAssetAccountNames failed with error %s', err.message);}
     return false
   }
   return assetAccountNames
@@ -335,7 +352,7 @@ function updateCatagories() {
     documentProperties.setProperty('LMCategories', JSON.stringify(categories));
     return categories
   } catch (err) {
-    if (debug) {Logger.log('Failed with error %s', err.message);}
+    if (LMdebug) {Logger.log('Failed with error %s', err.message);}
     displayToastAlert("Can't save categories for some reason");
     return
   }
