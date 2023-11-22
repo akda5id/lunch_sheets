@@ -6,11 +6,11 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 * (Planned, not started) Functions to return account totals and calculate net worth.
 
 ### Install:
-* Open the sheet you would like to use the tools in. Choose "Apps Script" from the Extensions menu. That will open a code editing page, if you don't have any existing Apps Scripts, it will be an empty function called "myFunction" in a file called Code.gs. Delete that empty function, and copy and paste everything [from Code.js in this repo](https://raw.githubusercontent.com/akda5id/lunch_sheets/main/Code.js) into your Code.gs.
-* If you do have other code in there, you can create a new file, and put this code into it. Heads up if you are using a custom menu, or otherwise using onLoad, there will be only be one onLoad called, so you will have to sort that out (put my onLoad code into yours, probably.)
-* Give the project a name (change "Untitled Project" to "Lunch Money Script", or whatever you want), then click the save icon, and close the window. 
-* Reload your spreadsheet and you should see a menu "Lunch Money" appear. Choose the "Set API Key" option. You will get a permission warning at this point. Click through that, it's saying that you are giving yourself permission to access your own data. On the "Google hasn’t verified this app" page, click "advanced", then "Go to…". 
-* After that completes, choose "Set API Key" again, to actually do it. Then put in your API key ([get one here](https://my.lunchmoney.app/developers)) at the prompt.
+1. Open the sheet you would like to use the tools in. Choose "Apps Script" from the Extensions menu. That will open a code editing page, if you don't have any existing Apps Scripts, it will be an empty function called "myFunction" in a file called Code.gs. Delete that empty function, and copy and paste everything [from Code.js in this repo](https://raw.githubusercontent.com/akda5id/lunch_sheets/main/Code.js) into your Code.gs.
+1. If you do have other code in there, you can create a new file, and put this code into it. Heads up if you are using a custom menu, or otherwise using onLoad, there will be only be one onLoad called, so you will have to sort that out (put my onLoad code into yours, probably.)
+1. Give the project a name (change "Untitled Project" to "Lunch Money Script", or whatever you want), then click the save icon, and close the window. 
+1. Reload your spreadsheet and you should see a menu "Lunch Money" appear. Choose the "Set API Key" option. You will get a permission warning at this point. Click through that, it's saying that you are giving yourself permission to access your own data. On the "Google hasn’t verified this app" page, click "advanced", then "Go to…". 
+1. After that completes, choose "Set API Key" again, to actually do it. Then put in your API key ([get one here](https://my.lunchmoney.app/developers)) at the prompt.
 
 ### Usage:
 * Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions from the first transaction date you enter. After the first run it will check for updated transactions in the 60 days before your last transaction currently in the sheet, and add new ones up until today to the end of the sheet.
@@ -41,6 +41,7 @@ Check to see if I have created a thread in the [Lunch Money Discord](https://dis
 * Expose a way to update Accounts (for name changes and such).
 * Better error handling and edge case detection. It's working for me now, but I expect to find places where it breaks as I use it more, and hear about many more as other people start using it.
 * What should I do with transactions that are deleted? I'm thinking hide them, but leave them in the sheet.
+* Check for deleted transactions other than ones that were pending?
 * Implement the rest of the planned features :)
 
 ### Security and Privacy Notes:
@@ -50,7 +51,7 @@ I only call the Lunch Money API, but the security warning you get when you first
   		"https://www.googleapis.com/auth/script.external_request",
   		"https://www.googleapis.com/auth/spreadsheets.currentonly"
 	],
-		"urlFetchWhitelist": [
+	"urlFetchWhitelist": [
   		"https://dev.lunchmoney.app/"
 	],
 
