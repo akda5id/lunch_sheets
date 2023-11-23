@@ -122,8 +122,9 @@ function findCat(LMCategories, catId) {
 
 function apiRequest(url) {
   if (LMdebug) {Logger.log('apiRequest for %s', url);}
+  let ssId = LMActiveSpreadsheet.getId();
   try {
-    var LMKey = LMDocumentProperties.getProperty('LMKey');
+    var LMKey = PropertiesService.getUserProperties().getProperty('LMKey_'+ssId);
     if (typeof LMKey !== 'string' || LMKey == '') {
       displayToastAlert("Can't find API key, make sure you have saved it");
       return false;
@@ -362,7 +363,8 @@ function displayPrompt(promptString) {
 }
 
 function setApiKey() {
-  LMDocumentProperties.setProperty('LMKey', displayPrompt("enter API key").getResponseText());
+  let ssId = LMActiveSpreadsheet.getId();
+  PropertiesService.getUserProperties().setProperty('LMKey_'+ssId, displayPrompt("enter API key").getResponseText());
   displayToastAlert("saved key")
 }
 

@@ -32,7 +32,7 @@ LMTransactionsLookback: Max number of transactions you would ever get from today
 LMPendingLookback: Number of transactions back from the current last one, to check for pending transactions that need to be updated. Probably just leave this at 300, no reason to make it less, it's fast. If for some reason you have lots of transactions that stay as pending and never update, then it would become a problem.
 
 ### Help:
-Check to see if I have created a thread in the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1134594318414389258), you can bug me there I guess.
+There is a thread on the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1176857773925998642), let me know how things are going. If you are not joined to the discord already [here is the signup link]((https://discord.gg/vSz6jjZuj8).
 
 ### Random Notes:
 * API key is per spreadsheet, so you can use separate "budgets" if you want, as long as you don't need them in the same spreadsheet.
@@ -45,6 +45,10 @@ Check to see if I have created a thread in the [Lunch Money Discord](https://dis
 * Implement the rest of the planned features :)
 
 ### Security and Privacy Notes:
+This script is read only on Lunch Money, as you can see in apiRequest, method is hard coded to 'get'. Hopefully one day Jen creates read only API keys so you can enforce that on your scripts that way.
+
+The API key is stored in the sheet document properties, so anyone who has access to your sheet can retrieve the API key. Don't share your financial spreadsheet with peeps you don't trust? I could store the key in your user store, but then if you wanted to use more than one budget, you would have to hack that somehow…
+
 I only call the Lunch Money API, but the security warning you get when you first run the script warns about "Create[ing] a network connection to any external service". If you would like to make sure that I can't slip anything sneaky past you, you can add these lines to your [manifest](https://developers.google.com/apps-script/concepts/manifests):
 
 	"oauthScopes": [
