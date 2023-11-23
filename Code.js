@@ -13,7 +13,7 @@ function onOpen() {
  */
 const LMdebug = true;         //write tracing info to the apps script log
 
-const jumpOnFinish = true;    //should we jump to the last row when we finish updating a sheet?
+const LMJumpOnFinish = true;    //should we jump to the last row when we finish updating a sheet?
 
 const LMTransactionsLookbackDays = 60 //number of days back from the current last one, to check for updated
                                       //category, etc. This one you should keep tight if you can, it's a bit slow.
@@ -28,17 +28,15 @@ var LMPendingLookback = 300;  //number of transactions back from the current las
  *  END OF SETTINGS
  */
 
-const documentProperties = PropertiesService.getDocumentProperties();
-const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-var transactionsAllSheet = null;
-var transactionsAllLastRow = null;
-var transactionAllIds = null;
-var transactionAllIdsStart = null;
+const LMDocumentProperties = PropertiesService.getDocumentProperties();
+const LMActiveSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+var LMTransactionAllIds = null;
+var LMTransactionAllIdsStart = null;
 
 function updateTransactionsAll() {
-  transactionAllIds = null;
-  transactionAllIdsStart = null;
-  transactionsAllSheet = activeSpreadsheet.getSheetByName("LM-Transactions-All");
+  LMTransactionAllIds = null;
+  LMTransactionAllIdsStart = null;
+  var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions-All");
   if (transactionsAllSheet == null) {
     let firstTransactionDate = displayPrompt("date of first transaction in yyyy-MM-dd format").getResponseText();
     var today = new Date();
@@ -50,15 +48,15 @@ function updateTransactionsAll() {
     transactionsAllSheet = createTransactionsAllSheet();
     transactionsAllSheet.getRange(2, 1, parsedTransactions.length, parsedTransactions[0].length).setValues(parsedTransactions);
   } else {
-    transactionsAllLastRow = transactionsAllSheet.getLastRow();
+    var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
-    checkPendings(LMCategories, plaidAccountNames, assetAccountNames);
-    let {startDate, endDate} = calulateRelitiveDates(LMTransactionsLookbackDays);
+    checkPendings(LMCategories, plaidAccountNames, assetAccountNames, transactionsAllSheet, transactionsAllLastRow);
+    let {startDate, endDate} = calulateRelitiveDates(LMTransactionsLookbackDays, transactionsAllSheet, transactionsAllLastRow);
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let parsedTransactions = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     for (const transaction of parsedTransactions) {
-      let row = findIdTransactionsAll(transaction[0].toFixed(0));
+      let row = findIdTransactionsAll(transaction[0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
       if (row > 0) {
          transactionsAllSheet.getRange(row, 1, 1, transaction.length).setValues([transaction]);
       } else {
@@ -67,11 +65,10 @@ function updateTransactionsAll() {
       }
     }
   }
-  if (jumpOnFinish) {jumpToLastRowTransactionsAll();}
+  if (LMJumpOnFinish) {transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));}
 }
 
-function checkPendings(LMCategories, plaidAccountNames, assetAccountNames) {
-  // if not coming from updateTransactionsAll, make sure transactionsAllSheet and transactionsAllLastRow are set
+function checkPendings(LMCategories, plaidAccountNames, assetAccountNames, transactionsAllSheet, transactionsAllLastRow) {
   var start = transactionsAllLastRow - LMPendingLookback;
   if (start < 1) {
     start = 1;
@@ -92,22 +89,22 @@ function checkPendings(LMCategories, plaidAccountNames, assetAccountNames) {
   }
 }
 
-function findIdTransactionsAll(id){
-  if (transactionAllIds == null) {
-    transactionAllIdsStart = transactionsAllLastRow - LMTransactionsLookback;
-    if (transactionAllIdsStart < 1) {
-      transactionAllIdsStart = 1;
+function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow){
+  if (LMTransactionAllIds == null) {
+    LMTransactionAllIdsStart = transactionsAllLastRow - LMTransactionsLookback;
+    if (LMTransactionAllIdsStart < 1) {
+      LMTransactionAllIdsStart = 1;
       LMTransactionsLookback = transactionsAllLastRow + 1;
     }
-    transactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, LMTransactionsLookback).getValues();
+    LMTransactionAllIds = transactionsAllSheet.getRange(LMTransactionAllIdsStart, 1, LMTransactionsLookback).getValues();
   }
 
-  let row = transactionAllIds.findIndex(foo => {return foo[0] == id});
-  return row + transactionAllIdsStart
+  let row = LMTransactionAllIds.findIndex(foo => {return foo[0] == id});
+  return row + LMTransactionAllIdsStart
 }
 
 function createTransactionsAllSheet() {
-  transactionsAllSheet = activeSpreadsheet.insertSheet('LM-Transactions-All');
+  var transactionsAllSheet = LMActiveSpreadsheet.insertSheet('LM-Transactions-All');
   let data = [['id', 'date', 'category name', 'payee', 'amount', 'notes', 'account name', 'tag', 'status', 'exclude from totals', 'exclude from budget', 'is income']]
   transactionsAllSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   return transactionsAllSheet
@@ -126,7 +123,7 @@ function findCat(LMCategories, catId) {
 function apiRequest(url) {
   if (LMdebug) {Logger.log('apiRequest for %s', url);}
   try {
-    var LMKey = documentProperties.getProperty('LMKey');
+    var LMKey = LMDocumentProperties.getProperty('LMKey');
     if (typeof LMKey !== 'string' || LMKey == '') {
       displayToastAlert("Can't find API key, make sure you have saved it");
       return false;
@@ -153,7 +150,7 @@ function apiRequest(url) {
   }
 }
 
-function calulateRelitiveDates(lookback) {
+function calulateRelitiveDates(lookback, transactionsAllSheet, transactionsAllLastRow) {
   let lastDate = transactionsAllSheet.getRange(transactionsAllLastRow, 2, 1).getValue();
   var startDate = new Date(lastDate);
   var endDate = new Date();
@@ -253,7 +250,7 @@ function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAcc
 
 function loadCategoriesAndAccounts() {
   try {
-    var plaidAccountNames = JSON.parse(documentProperties.getProperty('LMPlaidAccountNames'));
+    var plaidAccountNames = JSON.parse(LMDocumentProperties.getProperty('LMPlaidAccountNames'));
     if (plaidAccountNames == null) {
       plaidAccountNames = updatePlaidAccountNames()
       if (plaidAccountNames == false) {
@@ -266,7 +263,7 @@ function loadCategoriesAndAccounts() {
   }
 
   try {
-    var assetAccountNames = JSON.parse(documentProperties.getProperty('LMAssetAccountNames'));
+    var assetAccountNames = JSON.parse(LMDocumentProperties.getProperty('LMAssetAccountNames'));
     if (assetAccountNames == null) {
       assetAccountNames = updateAssetAccountNames();
       if (assetAccountNames == false) {
@@ -279,7 +276,7 @@ function loadCategoriesAndAccounts() {
   }
   
   try {
-    var LMCategories = JSON.parse(documentProperties.getProperty('LMCategories'));
+    var LMCategories = JSON.parse(LMDocumentProperties.getProperty('LMCategories'));
     if (typeof LMCategories !== 'object' || LMCategories == null) {
       LMCategories = updateCatagories();
     }
@@ -308,7 +305,7 @@ function updatePlaidAccountNames() {
     plaidAccountNames[plaidAccount.id] = plaidAccount.display_name;
   }
   try {
-    documentProperties.setProperty('LMPlaidAccountNames', JSON.stringify(plaidAccountNames));
+    LMDocumentProperties.setProperty('LMPlaidAccountNames', JSON.stringify(plaidAccountNames));
   } catch (err) {
     if (LMdebug) {Logger.log('Saving LMPlaidAccountNames failed with error %s', err.message);}
     return false
@@ -332,7 +329,7 @@ function updateAssetAccountNames() {
     assetAccountNames[asset.id] = asset.display_name;
   }
   try {
-    documentProperties.setProperty('LMAssetAccountNames', JSON.stringify(assetAccountNames));
+    LMDocumentProperties.setProperty('LMAssetAccountNames', JSON.stringify(assetAccountNames));
   } catch (err) {
     if (LMdebug) {Logger.log('Saving LMAssetAccountNames failed with error %s', err.message);}
     return false
@@ -349,24 +346,13 @@ function updateCatagories() {
     return
   }
   try {
-    documentProperties.setProperty('LMCategories', JSON.stringify(categories));
+    LMDocumentProperties.setProperty('LMCategories', JSON.stringify(categories));
     return categories
   } catch (err) {
     if (LMdebug) {Logger.log('Failed with error %s', err.message);}
     displayToastAlert("Can't save categories for some reason");
     return
   }
-}
-
-function jumpToLastRowTransactionsAll() {
-  if (transactionsAllSheet == null) {
-    transactionsAllSheet = activeSpreadsheet.getSheetByName("LM-Transactions-All");
-    if (transactionsAllSheet == null) {return;}
-  }
-  if (transactionsAllLastRow == null) {
-    transactionsAllLastRow = transactionsAllSheet.getLastRow()
-  }
-  transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));
 }
 
 function displayPrompt(promptString) {
@@ -376,7 +362,7 @@ function displayPrompt(promptString) {
 }
 
 function setApiKey() {
-  documentProperties.setProperty('LMKey', displayPrompt("enter API key").getResponseText());
+  LMDocumentProperties.setProperty('LMKey', displayPrompt("enter API key").getResponseText());
   displayToastAlert("saved key")
 }
 
