@@ -32,7 +32,7 @@ LMTransactionsLookback: Max number of transactions you would ever get from today
 LMPendingLookback: Number of transactions back from the current last one, to check for pending transactions that need to be updated. Probably just leave this at 300, no reason to make it less, it's fast. If for some reason you have lots of transactions that stay as pending and never update, then it would become a problem.
 
 ### Help:
-There is a thread on the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1176857773925998642), let me know how things are going. If you are not joined to the discord already [here is the signup link]((https://discord.gg/vSz6jjZuj8).
+There is a thread on the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1176857773925998642), let me know how things are going. If you are not joined to the discord already [here is the signup link](https://discord.gg/vSz6jjZuj8).
 
 ### Random Notes:
 * API key is per spreadsheet, so you can use separate "budgets" if you want, as long as you don't need them in the same spreadsheet.
