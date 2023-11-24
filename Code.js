@@ -15,27 +15,20 @@ const LMdebug = true;         //write tracing info to the apps script log
 
 const LMJumpOnFinish = true;    //should we jump to the last row when we finish updating a sheet?
 
-const LMTransactionsLookbackDays = 60 //number of days back from the current last one, to check for updated
-                                      //category, etc. This one you should keep tight if you can, it's a bit slow.
+const LMTransactionsLookbackDays = 70 //number of days back from the current last one, to check for updated
+                                      //category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
 
-var LMTransactionsLookback = 1000     //Max number of transactions you would ever get from today to LMTransactionsLookbackDays.
-                                      //Be generous, it's fast. If you start getting sets of old transactions added at the end of
-                                      //your sheet, this is where the problem is, make it bigger.
+const LMTransactionsLookback = 1000   //Max number of transactions you would ever get from today to LMTransactionsLookbackDays.
+                                      //Be generous, it's fast. Script will error with a warning if it is too small.
 
-var LMPendingLookback = 300;  //number of transactions back from the current last one, to check 
-                              //for pending transactions that need to be updated. Be generous, it's fast.
 /**
  *  END OF SETTINGS
  */
 
 const LMDocumentProperties = PropertiesService.getDocumentProperties();
 const LMActiveSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-var LMTransactionAllIds = null;
-var LMTransactionAllIdsStart = null;
 
 function updateTransactionsAll() {
-  LMTransactionAllIds = null;
-  LMTransactionAllIdsStart = null;
   var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions-All");
   if (transactionsAllSheet == null) {
     let firstTransactionDate = displayPrompt("date of first transaction in yyyy-MM-dd format").getResponseText();
@@ -47,60 +40,35 @@ function updateTransactionsAll() {
     let parsedTransactions = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     transactionsAllSheet = createTransactionsAllSheet();
     transactionsAllSheet.getRange(2, 1, parsedTransactions.length, parsedTransactions[0].length).setValues(parsedTransactions);
+    var transactionsAllLastRow = transactionsAllSheet.getLastRow();
   } else {
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
-    checkPendings(LMCategories, plaidAccountNames, assetAccountNames, transactionsAllSheet, transactionsAllLastRow);
     let {startDate, endDate} = calulateRelitiveDates(LMTransactionsLookbackDays, transactionsAllSheet, transactionsAllLastRow);
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let parsedTransactions = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
-    for (const transaction of parsedTransactions) {
-      let row = findIdTransactionsAll(transaction[0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
-      if (row > 0) {
-         transactionsAllSheet.getRange(row, 1, 1, transaction.length).setValues([transaction]);
-      } else {
-        transactionsAllLastRow = transactionsAllLastRow + 1;
-        transactionsAllSheet.getRange(transactionsAllLastRow, 1, 1, transaction.length).setValues([transaction]);
-      }
-    }
+    let row = findIdTransactionsAll(parsedTransactions[0][0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
+    let transactionsLength = parsedTransactions.length
+    if (transactionsLength >= LMTransactionsLookback) {throw new Error('CAUTION! LMTransactionsLookback is not large enough!');}
+    if (LMdebug) {Logger.log('updateTransactionsAll: overwriting from row: %s', row);}
+    transactionsAllSheet.getRange(row, 1, transactionsLength, parsedTransactions[0].length).setValues(parsedTransactions);
+    transactionsAllSheet.deleteRows(row+transactionsLength, 50); //not an off by one error, we want delete from the row after
   }
   if (LMJumpOnFinish) {transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));}
 }
 
-function checkPendings(LMCategories, plaidAccountNames, assetAccountNames, transactionsAllSheet, transactionsAllLastRow) {
-  var start = transactionsAllLastRow - LMPendingLookback;
-  if (start < 1) {
-    start = 1;
-    LMPendingLookback = transactionsAllLastRow + 1;
-  }
-  let search = 'pending';
-  var data = transactionsAllSheet.getRange(start, 9, LMPendingLookback).getValues();
-  var ids = transactionsAllSheet.getRange(start, 1, LMPendingLookback).getValues();
-  while (true) {
-    let index = data.findIndex(foo => {return foo[0] == search});
-    if (index < 0) {break;}
-    let url = 'https://dev.lunchmoney.app/v1/transactions/' + ids[index] + '?debit_as_negative=true';
-    let transaction = apiRequest(url);
-    let parsedTransaction = parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames);
-    let trasactionArray = [parseInt(parsedTransaction.id), parsedTransaction.date, parsedTransaction.category_name, parsedTransaction.payee, parsedTransaction.to_base, parsedTransaction.notes, parsedTransaction.account_name, parsedTransaction.tag_string, parsedTransaction.status, parsedTransaction.exclude_from_totals, parsedTransaction.exclude_from_budget, parsedTransaction.is_income];
-    transactionsAllSheet.getRange(index + start, 1, 1, trasactionArray.length).setValues([trasactionArray]);
-    data[index] = 'foo';
-  }
-}
-
 function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow){
-  if (LMTransactionAllIds == null) {
-    LMTransactionAllIdsStart = transactionsAllLastRow - LMTransactionsLookback;
-    if (LMTransactionAllIdsStart < 1) {
-      LMTransactionAllIdsStart = 1;
-      LMTransactionsLookback = transactionsAllLastRow + 1;
-    }
-    LMTransactionAllIds = transactionsAllSheet.getRange(LMTransactionAllIdsStart, 1, LMTransactionsLookback).getValues();
+  var transactionsLookback = LMTransactionsLookback;
+  let transactionAllIdsStart = transactionsAllLastRow - transactionsLookback;
+  if (transactionAllIdsStart < 2) {
+    transactionAllIdsStart = 2;
+    transactionsLookback = transactionsAllLastRow + 1;
   }
+  let LMTransactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, transactionsLookback).getValues();
 
   let row = LMTransactionAllIds.findIndex(foo => {return foo[0] == id});
-  return row + LMTransactionAllIdsStart
+  return row + transactionAllIdsStart
 }
 
 function createTransactionsAllSheet() {
