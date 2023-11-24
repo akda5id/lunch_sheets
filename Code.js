@@ -15,12 +15,11 @@ const LMdebug = true;           //write tracing info to the apps script log
 
 const LMJumpOnFinish = false;    //should we jump to the last row when we finish updating a sheet?
 
-const LMTransactionsLookbackMonths = 2//number of full months we will pull transactions from, prior to the current one, to check
+const LMTransactionsLookbackMonths = 1//number of full months we will pull transactions from, prior to the current one, to check
                                       //for updated category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
 
 const LMTransactionsLookback = 1000   //Max number of transactions you would ever get from today to LMTransactionsLookbackMonths.
                                       //Be generous, it's fast. Script will error with a warning if it is too small.
-
 /**
  *  END OF SETTINGS
  */
@@ -158,17 +157,57 @@ function loadTransactions(startDate, endDate) {
   }
 }
 
+function coalesce(object, period, parsedTransaction, name) {
+  if (object.hasOwnProperty(period)) {
+    if (object[period].hasOwnProperty(name)) {
+      object[period][name] += parsedTransaction.to_base;
+    } else {
+      object[period][name] = parsedTransaction.to_base;
+    }
+  } else {
+    object[period] = new Object();
+    object[period][name] = parsedTransaction.to_base;
+  }
+}
+
 function parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames) {
   var parsedTransactions_2d = [];
-  var parsedTransactions = [];
+  var months = {};
+  var days = {};
 
   for (const transaction of transactions) {
     let parsedTransaction = parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames);
-    parsedTransactions.push(parsedTransaction);
 
-    parsedTransactions_2d.push([parseInt(parsedTransaction.id), parsedTransaction.date, parsedTransaction.category_name, parsedTransaction.payee, parsedTransaction.to_base, parsedTransaction.notes, parsedTransaction.account_name, parsedTransaction.tag_string, parsedTransaction.status, parsedTransaction.exclude_from_totals, parsedTransaction.exclude_from_budget, parsedTransaction.is_income]);
+    if (!parsedTransaction.exclude_from_budget) {
+      let month = parsedTransaction.date.slice(0, -3);
+      let day = parsedTransaction.date;
+      coalesce(months, month, parsedTransaction, parsedTransaction.category_name);
+      coalesce(days, day, parsedTransaction, parsedTransaction.category_name);
+      if (parsedTransaction.hasOwnProperty('group_name')) {
+        coalesce(months, month, parsedTransaction, parsedTransaction.group_name);
+        coalesce(days, day, parsedTransaction, parsedTransaction.group_name);
+      }
+      if (!parsedTransaction.exclude_from_totals && !parsedTransaction.is_income) {
+        coalesce(months, month, parsedTransaction, 'Total Exp');
+        coalesce(days, day, parsedTransaction, 'Total Exp');
+      }
+      if (!parsedTransaction.exclude_from_totals) {
+        coalesce(months, month, parsedTransaction, 'Total');
+        coalesce(days, day, parsedTransaction, 'Total');
+      }
+      if (transaction.hasOwnProperty('tags') && transaction.tags != null && transaction.tags.length > 0) {
+        for (const tag of transaction.tags) {
+          coalesce(months, month, parsedTransaction, tag.name);
+          coalesce(days, day, parsedTransaction, tag.name);
+        }
+      }
+    }
+
+    parsedTransactions_2d.push([parseInt(parsedTransaction.id), parsedTransaction.date, parsedTransaction.category_string, parsedTransaction.payee, parsedTransaction.to_base, parsedTransaction.notes, parsedTransaction.account_name, parsedTransaction.tag_string, parsedTransaction.status, parsedTransaction.exclude_from_totals, parsedTransaction.exclude_from_budget, parsedTransaction.is_income]);
   }
-  return {parsedTransactions_2d, parsedTransactions}
+  if (LMdebug) {Logger.log('months: %s', months);}
+  if (LMdebug) {Logger.log('days: %s', days);}
+  return {parsedTransactions_2d, months}
 }
 
 function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames) {
@@ -187,14 +226,17 @@ function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAcc
     var category = findCat(LMCategories, transaction.category_id);
     transaction.category_name = category.name;
     if (category.group_id != null) {
-      category = findCat(LMCategories, category.group_id);
-      transaction.category_name = category.name + '/' + transaction.category_name;
+      let groupCategory = findCat(LMCategories, category.group_id);
+      transaction.category_string = groupCategory.name + '/' + transaction.category_name;
+      transaction.group_name = groupCategory.name
+    } else {
+      transaction.category_string = transaction.category_name;
     }
     transaction.exclude_from_totals = category.exclude_from_totals;
     transaction.is_income = category.is_income;
     transaction.exclude_from_budget = category.exclude_from_budget;
   } else {
-    transaction.category_name = '';
+    transaction.category_string = '';
     transaction.exclude_from_totals = '';
     transaction.is_income = '';
     transaction.exclude_from_budget = ''; 
