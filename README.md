@@ -13,7 +13,7 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 1. After that completes, choose "Set API Key" again, to actually do it. Then put in your API key ([get one here](https://my.lunchmoney.app/developers)) at the prompt.
 
 ### Usage:
-* Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions from the first transaction date you enter. After the first run it will check for updated transactions in the 60 days before your last transaction currently in the sheet, and add new ones up until today to the end of the sheet.
+* Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions. After the first run it will check for updated transactions in the 70 days before your last transaction currently in the sheet, and add new ones up until today to the end of the sheet.
 * That's all it does for now, more coming!
 
 ### Settings:

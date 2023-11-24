@@ -31,7 +31,7 @@ const LMActiveSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 function updateTransactionsAll() {
   var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions-All");
   if (transactionsAllSheet == null) {
-    let firstTransactionDate = displayPrompt("date of first transaction in yyyy-MM-dd format").getResponseText();
+    let firstTransactionDate = '1970-01-01';
     var today = new Date();
     today = Utilities.formatDate(today, "GMT", "yyyy-MM-dd");
     let transactions = loadTransactions(firstTransactionDate, today);
