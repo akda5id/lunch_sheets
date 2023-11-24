@@ -11,14 +11,14 @@ function onOpen() {
 /**
  *  SETTINGS:
  */
-const LMdebug = true;         //write tracing info to the apps script log
+const LMdebug = true;           //write tracing info to the apps script log
 
-const LMJumpOnFinish = true;    //should we jump to the last row when we finish updating a sheet?
+const LMJumpOnFinish = false;    //should we jump to the last row when we finish updating a sheet?
 
-const LMTransactionsLookbackDays = 70 //number of days back from the current last one, to check for updated
-                                      //category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
+const LMTransactionsLookbackMonths = 2//number of full months we will pull transactions from, prior to the current one, to check
+                                      //for updated category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
 
-const LMTransactionsLookback = 1000   //Max number of transactions you would ever get from today to LMTransactionsLookbackDays.
+const LMTransactionsLookback = 1000   //Max number of transactions you would ever get from today to LMTransactionsLookbackMonths.
                                       //Be generous, it's fast. Script will error with a warning if it is too small.
 
 /**
@@ -37,23 +37,29 @@ function updateTransactionsAll() {
     let transactions = loadTransactions(firstTransactionDate, today);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
-    let parsedTransactions = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
+    let {parsedTransactions_2d, parsedTransactions} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     transactionsAllSheet = createTransactionsAllSheet();
-    transactionsAllSheet.getRange(2, 1, parsedTransactions.length, parsedTransactions[0].length).setValues(parsedTransactions);
+    transactionsAllSheet.getRange(2, 1, parsedTransactions_2d.length, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
   } else {
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
-    let {startDate, endDate} = calulateRelitiveDates(LMTransactionsLookbackDays, transactionsAllSheet, transactionsAllLastRow);
+    let {startDate, endDate} = calulateRelativeDates();
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
-    let parsedTransactions = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
-    let row = findIdTransactionsAll(parsedTransactions[0][0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
-    let transactionsLength = parsedTransactions.length
+    let {parsedTransactions_2d, parsedTransactions} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
+    let row = findIdTransactionsAll(parsedTransactions_2d[0][0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
+    let transactionsLength = parsedTransactions_2d.length;
     if (transactionsLength >= LMTransactionsLookback) {throw new Error('CAUTION! LMTransactionsLookback is not large enough!');}
+    if (transactionsAllSheet.getMaxRows() < row+transactionsLength+60) {
+      let need = row+transactionsLength+500 - transactionsAllSheet.getMaxRows();
+      if (LMdebug) {Logger.log('updateTransactionsAll: adding %s rows', need);}
+      transactionsAllSheet.insertRowsAfter(transactionsAllLastRow, need);
+    }
     if (LMdebug) {Logger.log('updateTransactionsAll: overwriting from row: %s', row);}
-    transactionsAllSheet.getRange(row, 1, transactionsLength, parsedTransactions[0].length).setValues(parsedTransactions);
-    transactionsAllSheet.deleteRows(row+transactionsLength, 50); //not an off by one error, we want delete from the row after
+    transactionsAllSheet.getRange(row, 1, transactionsLength, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
+    transactionsAllSheet.getRange(row+transactionsLength, 1, 50, parsedTransactions_2d[0].length).clear();
+    // transactionsAllSheet.deleteRows(row+transactionsLength, 10); //not an off by one error, we want delete from the row after
   }
   if (LMJumpOnFinish) {transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));}
 }
@@ -119,11 +125,10 @@ function apiRequest(url) {
   }
 }
 
-function calulateRelitiveDates(lookback, transactionsAllSheet, transactionsAllLastRow) {
-  let lastDate = transactionsAllSheet.getRange(transactionsAllLastRow, 2, 1).getValue();
-  var startDate = new Date(lastDate);
+function calulateRelativeDates() {
+  var startDate = new Date();
   var endDate = new Date();
-  startDate.setDate(startDate.getDate() - lookback);
+  startDate.setMonth(startDate.getMonth() - LMTransactionsLookbackMonths, 1);
   endDate.setDate(endDate.getDate() + 2);
   startDate = Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd");
   endDate = Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd");
@@ -154,13 +159,16 @@ function loadTransactions(startDate, endDate) {
 }
 
 function parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames) {
-  var transactions_2d = [];
+  var parsedTransactions_2d = [];
+  var parsedTransactions = [];
 
   for (const transaction of transactions) {
     let parsedTransaction = parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames);
-    transactions_2d.push([parseInt(parsedTransaction.id), parsedTransaction.date, parsedTransaction.category_name, parsedTransaction.payee, parsedTransaction.to_base, parsedTransaction.notes, parsedTransaction.account_name, parsedTransaction.tag_string, parsedTransaction.status, parsedTransaction.exclude_from_totals, parsedTransaction.exclude_from_budget, parsedTransaction.is_income]);
+    parsedTransactions.push(parsedTransaction);
+
+    parsedTransactions_2d.push([parseInt(parsedTransaction.id), parsedTransaction.date, parsedTransaction.category_name, parsedTransaction.payee, parsedTransaction.to_base, parsedTransaction.notes, parsedTransaction.account_name, parsedTransaction.tag_string, parsedTransaction.status, parsedTransaction.exclude_from_totals, parsedTransaction.exclude_from_budget, parsedTransaction.is_income]);
   }
-  return transactions_2d
+  return {parsedTransactions_2d, parsedTransactions}
 }
 
 function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames) {
