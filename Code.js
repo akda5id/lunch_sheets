@@ -109,9 +109,9 @@ function writeCoalesed(months, days) {
         let index = headers.indexOf(key);
         if ( index == -1 ) {
           if (LMdebug) {Logger.log('didn\'t find %s', key);}
-          index = headers.push(key);
-          monthsSheet.getRange(1,monthsSheet.getLastColumn()+1).setValue(key);
-          monthsSheet.getRange(row,index).setValue(value.toFixed(2));
+          index = headers.push(key) - 1; //push returns length, we want index which is one less
+          monthsSheet.getRange(1, monthsSheet.getLastColumn()+1).setValue(key);
+          monthsSheet.getRange(row,index+1).setValue(value.toFixed(2));
         } else {
           monthsSheet.getRange(row,index+1).setValue(value.toFixed(2));
         }
@@ -123,6 +123,7 @@ function writeCoalesed(months, days) {
 function findDate(sheet, date) {
   let dates = sheet.getRange(2, 1, sheet.getLastRow()).getValues();
   let row = dates.findIndex(foo => {return foo[0] >= date});
+  if (LMdebug) {Logger.log('findDate row %s', row);}
   if (row == -1) { return -1; }
   return row+2;
 }
@@ -138,6 +139,13 @@ function createMonthsSheet() {
     if (!category.exclude_from_budget) { headers.push(category.name); }
   }
   monthsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  let dateCol = monthsSheet.getRange("A1:A");
+  dateCol.setNumberFormat("@");
+  let firstRow = monthsSheet.getRange(1, 1, monthsSheet.getMaxRows(), monthsSheet.getMaxColumns());
+  firstRow.setNumberFormat("@");
+  let theRest = monthsSheet.getRange(2, 2, monthsSheet.getMaxRows(), monthsSheet.getMaxColumns());
+  theRest.setNumberFormat("$#,##0.00;$(#,##0.00)");
+
   return monthsSheet;
 }
 
