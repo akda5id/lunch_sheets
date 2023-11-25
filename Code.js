@@ -20,6 +20,10 @@ const LMTransactionsLookbackMonths = 1//number of full months we will pull trans
 
 const LMTransactionsLookback = 1000   //Max number of transactions you would ever get from today to LMTransactionsLookbackMonths.
                                       //Be generous, it's fast. Script will error with a warning if it is too small.
+
+const LMCoalesce = true       //Should we total up all categories and tags and write to separate sheet?
+const LMCoalesceMonths = true //if so, by months?
+const LMCoalesceDays = true   //and by days?
 /**
  *  END OF SETTINGS
  */
@@ -36,17 +40,18 @@ function updateTransactionsAll() {
     let transactions = loadTransactions(firstTransactionDate, today);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
-    let {parsedTransactions_2d, parsedTransactions} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
+    let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     transactionsAllSheet = createTransactionsAllSheet();
     transactionsAllSheet.getRange(2, 1, parsedTransactions_2d.length, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
+    if (LMCoalesce) {writeCoalesed(months, days);}
   } else {
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
     let {startDate, endDate} = calulateRelativeDates();
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
-    let {parsedTransactions_2d, parsedTransactions} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
+    let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     let row = findIdTransactionsAll(parsedTransactions_2d[0][0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
     let transactionsLength = parsedTransactions_2d.length;
     if (transactionsLength >= LMTransactionsLookback) {throw new Error('CAUTION! LMTransactionsLookback is not large enough!');}
@@ -58,7 +63,7 @@ function updateTransactionsAll() {
     if (LMdebug) {Logger.log('updateTransactionsAll: overwriting from row: %s', row);}
     transactionsAllSheet.getRange(row, 1, transactionsLength, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     transactionsAllSheet.getRange(row+transactionsLength, 1, 50, parsedTransactions_2d[0].length).clear();
-    // transactionsAllSheet.deleteRows(row+transactionsLength, 10); //not an off by one error, we want delete from the row after
+    if (LMCoalesce) {writeCoalesed(months, days);}
   }
   if (LMJumpOnFinish) {transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));}
 }
@@ -70,9 +75,9 @@ function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow)
     transactionAllIdsStart = 2;
     transactionsLookback = transactionsAllLastRow + 1;
   }
-  let LMTransactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, transactionsLookback).getValues();
+  let transactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, transactionsLookback).getValues();
 
-  let row = LMTransactionAllIds.findIndex(foo => {return foo[0] == id});
+  let row = transactionAllIds.findIndex(foo => {return foo[0] == id});
   return row + transactionAllIdsStart
 }
 
@@ -81,6 +86,59 @@ function createTransactionsAllSheet() {
   let data = [['id', 'date', 'category name', 'payee', 'amount', 'notes', 'account name', 'tag', 'status', 'exclude from totals', 'exclude from budget', 'is income']]
   transactionsAllSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   return transactionsAllSheet
+}
+
+function writeCoalesed(months, days) {
+  if (LMdebug) {Logger.log('months %s', months);}
+  if (LMCoalesceMonths) {
+    var monthsSheet = LMActiveSpreadsheet.getSheetByName("LM-Months");
+    if (monthsSheet == null) { monthsSheet = createMonthsSheet(); }
+    var headers = monthsSheet.getRange(1, 1, 1, monthsSheet.getLastColumn()).getValues()[0];
+    var monthKeys = Object.keys(months).sort();
+    var row = findDate(monthsSheet, monthKeys[0]);
+    if ( row == -1 ) { row = monthsSheet.getLastRow() + 1; } else {
+      monthsSheet.getRange(row, 1, monthsSheet.getLastRow()-row+1, monthsSheet.getLastColumn()).clear();
+    }
+    row -= 1;
+    for (const month of monthKeys) {
+      row += 1;
+      monthsSheet.getRange(row,1).setValue(month)
+      if (LMdebug) {Logger.log('month %s', month);}
+      for (const [key, value] of Object.entries(months[month])) {
+        if (LMdebug) {Logger.log('key %s, value %s', key, value.toFixed(2));}
+        let index = headers.indexOf(key);
+        if ( index == -1 ) {
+          if (LMdebug) {Logger.log('didn\'t find %s', key);}
+          index = headers.push(key);
+          monthsSheet.getRange(1,monthsSheet.getLastColumn()+1).setValue(key);
+          monthsSheet.getRange(row,index).setValue(value.toFixed(2));
+        } else {
+          monthsSheet.getRange(row,index+1).setValue(value.toFixed(2));
+        }
+      }
+    }
+  }
+}
+
+function findDate(sheet, date) {
+  let dates = sheet.getRange(2, 1, sheet.getLastRow()).getValues();
+  let row = dates.findIndex(foo => {return foo[0] >= date});
+  if (row == -1) { return -1; }
+  return row+2;
+}
+
+function createMonthsSheet() {
+  var monthsSheet = LMActiveSpreadsheet.insertSheet('LM-Months');
+  var LMCategories = JSON.parse(LMDocumentProperties.getProperty('LMCategories'));
+  LMCategories.sort((a, b) => a.order - b.order);
+  var headers = [];
+  headers.push('Date', 'Total Net', 'Total Exp');
+
+  for (const category of LMCategories) {
+    if (!category.exclude_from_budget) { headers.push(category.name); }
+  }
+  monthsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  return monthsSheet;
 }
 
 function findCat(LMCategories, catId) {
@@ -178,7 +236,7 @@ function parseTransactions(transactions, LMCategories, plaidAccountNames, assetA
   for (const transaction of transactions) {
     let parsedTransaction = parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames);
 
-    if (!parsedTransaction.exclude_from_budget) {
+    if (LMCoalesce && !parsedTransaction.exclude_from_budget) {
       let month = parsedTransaction.date.slice(0, -3);
       let day = parsedTransaction.date;
       coalesce(months, month, parsedTransaction, parsedTransaction.category_name);
@@ -192,8 +250,8 @@ function parseTransactions(transactions, LMCategories, plaidAccountNames, assetA
         coalesce(days, day, parsedTransaction, 'Total Exp');
       }
       if (!parsedTransaction.exclude_from_totals) {
-        coalesce(months, month, parsedTransaction, 'Total');
-        coalesce(days, day, parsedTransaction, 'Total');
+        coalesce(months, month, parsedTransaction, 'Total Net');
+        coalesce(days, day, parsedTransaction, 'Total Net');
       }
       if (transaction.hasOwnProperty('tags') && transaction.tags != null && transaction.tags.length > 0) {
         for (const tag of transaction.tags) {
@@ -205,9 +263,7 @@ function parseTransactions(transactions, LMCategories, plaidAccountNames, assetA
 
     parsedTransactions_2d.push([parseInt(parsedTransaction.id), parsedTransaction.date, parsedTransaction.category_string, parsedTransaction.payee, parsedTransaction.to_base, parsedTransaction.notes, parsedTransaction.account_name, parsedTransaction.tag_string, parsedTransaction.status, parsedTransaction.exclude_from_totals, parsedTransaction.exclude_from_budget, parsedTransaction.is_income]);
   }
-  if (LMdebug) {Logger.log('months: %s', months);}
-  if (LMdebug) {Logger.log('days: %s', days);}
-  return {parsedTransactions_2d, months}
+  return {parsedTransactions_2d, months, days}
 }
 
 function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames) {

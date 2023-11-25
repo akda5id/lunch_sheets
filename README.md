@@ -1,9 +1,9 @@
 # Lunch (in the) Sheets
 Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmoney.app/?refer=be4tew9v) to Google Sheets.
-* (Working, beta) Import all transactions to a sheet called "LM-Transactions-All", and update it with new transactions, semi-intelligently.
-* (Planned, not started) Coalesce category and tag totals per day, and per month.
-* (Planned, not started) A user function to total a category or tag for a date range.
-* (Planned, not started) Functions to return account totals and calculate net worth.
+* Import all transactions to a sheet called "LM-Transactions-All", and update it with new transactions, semi-intelligently.
+* Coalesce category and tag totals per day, and per month. (In Progress)
+* A user function to total a category or tag for a date range. (Planned, not started)
+* Functions to return account totals and calculate net worth. (Planned, not started)
 
 ### Install:
 1. Open the sheet you would like to use the tools in. Choose "Apps Script" from the Extensions menu. That will open a code editing page, if you don't have any existing Apps Scripts, it will be an empty function called "myFunction" in a file called Code.gs. Delete that empty function, and copy and paste everything [from Code.js in this repo](https://raw.githubusercontent.com/akda5id/lunch_sheets/main/Code.js) into your Code.gs.
@@ -13,7 +13,7 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 1. After that completes, choose "Set API Key" again, to actually do it. Then put in your API key ([get one here](https://my.lunchmoney.app/developers)) at the prompt.
 
 ### Usage:
-* Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions. After the first run it will check for updated transactions in the 70 days before your last transaction currently in the sheet, and add new ones up until today to the end of the sheet.
+* Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions. After the first run it will check for updated transactions in the month previous, and add new ones up until today to the end of the sheet.
 * That's all it does for now, more coming!
 
 ### Settings:
