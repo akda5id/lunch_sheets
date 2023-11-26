@@ -91,8 +91,8 @@ function createTransactionsAllSheet() {
 function writeCoalesed(months, days) {
   if (LMdebug) {Logger.log('months %s', months);}
   if (LMCoalesceMonths) {
-    var monthsSheet = LMActiveSpreadsheet.getSheetByName("LM-Months");
-    if (monthsSheet == null) { monthsSheet = createMonthsSheet(); }
+    var monthsSheet = LMActiveSpreadsheet.getSheetByName('LM-Months');
+    if (monthsSheet == null) { monthsSheet = createSheet('LM-Months'); }
     var headers = monthsSheet.getRange(1, 1, 1, monthsSheet.getLastColumn()).getValues()[0];
     var monthKeys = Object.keys(months).sort();
     var row = findDate(monthsSheet, monthKeys[0]);
@@ -118,6 +118,35 @@ function writeCoalesed(months, days) {
       }
     }
   }
+  if (LMdebug) {Logger.log('days %s', days);}
+  if (LMCoalesceDays) {
+    var daysSheet = LMActiveSpreadsheet.getSheetByName('LM-Days');
+    if (daysSheet == null) { daysSheet = createSheet('LM-Days'); }
+    var headers = daysSheet.getRange(1, 1, 1, daysSheet.getLastColumn()).getValues()[0];
+    var daysKeys = Object.keys(days).sort();
+    var row = findDate(daysSheet, daysKeys[0]);
+    if ( row == -1 ) { row = daysSheet.getLastRow() + 1; } else {
+      daysSheet.getRange(row, 1, daysSheet.getLastRow()-row+1, daysSheet.getLastColumn()).clear();
+    }
+    row -= 1;
+    for (const day of daysKeys) {
+      row += 1;
+      daysSheet.getRange(row,1).setValue(day)
+      if (LMdebug) {Logger.log('day %s', day);}
+      for (const [key, value] of Object.entries(days[day])) {
+        if (LMdebug) {Logger.log('key %s, value %s', key, value.toFixed(2));}
+        let index = headers.indexOf(key);
+        if ( index == -1 ) {
+          if (LMdebug) {Logger.log('didn\'t find %s', key);}
+          index = headers.push(key) - 1; //push returns length, we want index which is one less
+          daysSheet.getRange(1, daysSheet.getLastColumn()+1).setValue(key);
+          daysSheet.getRange(row,index+1).setValue(value.toFixed(2));
+        } else {
+          daysSheet.getRange(row,index+1).setValue(value.toFixed(2));
+        }
+      }
+    }
+  }
 }
 
 function findDate(sheet, date) {
@@ -128,8 +157,8 @@ function findDate(sheet, date) {
   return row+2;
 }
 
-function createMonthsSheet() {
-  var monthsSheet = LMActiveSpreadsheet.insertSheet('LM-Months');
+function createSheet(name) {
+  var sheet = LMActiveSpreadsheet.insertSheet(name);
   var LMCategories = JSON.parse(LMDocumentProperties.getProperty('LMCategories'));
   LMCategories.sort((a, b) => a.order - b.order);
   var headers = [];
@@ -138,15 +167,15 @@ function createMonthsSheet() {
   for (const category of LMCategories) {
     if (!category.exclude_from_budget) { headers.push(category.name); }
   }
-  monthsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  let dateCol = monthsSheet.getRange("A1:A");
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  let dateCol = sheet.getRange("A1:A");
   dateCol.setNumberFormat("@");
-  let firstRow = monthsSheet.getRange(1, 1, monthsSheet.getMaxRows(), monthsSheet.getMaxColumns());
+  let firstRow = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
   firstRow.setNumberFormat("@");
-  let theRest = monthsSheet.getRange(2, 2, monthsSheet.getMaxRows(), monthsSheet.getMaxColumns());
+  let theRest = sheet.getRange(2, 2, sheet.getMaxRows(), sheet.getMaxColumns());
   theRest.setNumberFormat("$#,##0.00;$(#,##0.00)");
 
-  return monthsSheet;
+  return sheet;
 }
 
 function findCat(LMCategories, catId) {

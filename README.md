@@ -1,7 +1,7 @@
 # Lunch (in the) Sheets
 Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmoney.app/?refer=be4tew9v) to Google Sheets.
 * Import all transactions to a sheet called "LM-Transactions-All", and update it with new transactions, semi-intelligently.
-* Coalesce category and tag totals per day, and per month. (In Progress)
+* Coalesce category and tag totals per day, and per month.
 * A user function to total a category or tag for a date range. (Planned, not started)
 * Functions to return account totals and calculate net worth. (Planned, not started)
 
@@ -17,13 +17,13 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 * That's all it does for now, more coming!
 
 ### Settings:
-In the Lunch Money menu, there is an option to "Update Categories". Run this if you change the name, grouping, or hide from budget, income, etc. of categories. I cache them between runs as I don't expect them to change often, so it's a manual update. Note that if you do adjust them, it will only update for transactions in LookbackDays (see below). If you want to rerun on all transactions, just delete or rename the LM-Transactions-All sheet.
+In the Lunch Money menu, there is an option to "Update Categories". Run this if you change the name, grouping, or hide from budget, income, etc. of categories. I cache them between runs as I don't expect them to change often, so it's a manual update. Note that if you do adjust them, it will only update for transactions in LookbackMonths (see below). If you want to rerun on all transactions, just delete or rename the LM-Transactions-All sheet.
 
 There are a few things at the top of [Code.gs](Code.js) that you can adjust:
 
 LMdebug: Write tracing info to the apps script log, if you are having trouble with the script, this might help us figure out what's going on.
 
-jumpOnFinish: If you want it to take you to the end of a sheet after an update is run. False will leave you wherever you were when you ran the update.
+jumpOnFinish: If you want it to take you to the end of the transaction sheet after an update is run. False will leave you wherever you were when you ran the update.
 
 LMTransactionsLookbackMonths: Number of full months we will pull transactions from, prior to the current one, to check for updated category, etc. This one you should keep tight if you can, for efficiency. Basically if you always have all your transactions perfectly set and organized in Lunch Money before you pull them into sheets, you could set this to 0. But if you want to pull things into sheets during the month, and you only go through and categorize in Lunch Money at the end of the month, it should be at least 1, to make sure you pull in updates from the previous month. If you don't have so many transactions a month, it's fine to leave it at 2, then you don't really have to think about it.
 
@@ -38,8 +38,6 @@ There is a thread on the [Lunch Money Discord](https://discord.com/channels/8423
 ### To Do:
 * Expose a way to update Accounts (for name changes and such).
 * Better error handling and edge case detection. It's working for me now, but I expect to find places where it breaks as I use it more, and hear about many more as other people start using it.
-* What should I do with transactions that are deleted? I'm thinking hide them, but leave them in the sheet.
-* Check for deleted transactions other than ones that were pending?
 * Implement the rest of the planned features :)
 
 ### Security and Privacy Notes:
