@@ -43,8 +43,6 @@ There is a thread on the [Lunch Money Discord](https://discord.com/channels/8423
 ### Security and Privacy Notes:
 This script is read only on Lunch Money, as you can see in apiRequest, method is hard coded to 'get'. Hopefully one day Jen creates read only API keys so you can enforce that on your scripts that way.
 
-The API key is stored in the sheet document properties, so anyone who has access to your sheet can retrieve the API key. Don't share your financial spreadsheet with peeps you don't trust? I could store the key in your user store, but then if you wanted to use more than one budget, you would have to hack that somehow…
-
 I only call the Lunch Money API, but the security warning you get when you first run the script warns about "Create[ing] a network connection to any external service". If you would like to make sure that I can't slip anything sneaky past you, you can add these lines to your [manifest](https://developers.google.com/apps-script/concepts/manifests):
 
 	"oauthScopes": [
