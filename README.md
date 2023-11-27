@@ -1,7 +1,7 @@
 # Lunch (in the) Sheets
 Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmoney.app/?refer=be4tew9v) to Google Sheets.
 * Import all transactions to a sheet called "LM-Transactions-All", and update it with new transactions, semi-intelligently.
-* Coalesce category and tag totals per day, and per month.
+* Sum up category and tag totals per day, and per month.
 * A user function to total a category or tag for a date range. (Planned, not started)
 * Functions to return account totals and calculate net worth. (Planned, not started)
 
@@ -29,11 +29,14 @@ LMTransactionsLookbackMonths: Number of full months we will pull transactions fr
 
 LMTransactionsLookback: Max number of transactions you would ever get from today to the date resulting from LMTransactionsLookbackMonths. So if you pull once a month, and have a one month lookback, you need to have at least two months of transactions here. Be generous, it's fast. Script will throw an error if it's ever too little.
 
+LMCoalesce\*: If you want to write the various sum up category and tags sheets. Should be self explanatory with the comments there.
+
 ### Help:
 There is a thread on the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1176857773925998642), let me know how things are going. If you are not joined to the discord already [here is the signup link](https://discord.gg/vSz6jjZuj8).
 
 ### Random Notes:
 * API key is per spreadsheet, so you can use separate "budgets" if you want, as long as you don't need them in the same spreadsheet.
+* You can re-order columns in the LM-Days and LM-Months sheets as you like. Not in LM-Transactions-All, but you can hide columns.
 
 ### To Do:
 * Expose a way to update Accounts (for name changes and such).

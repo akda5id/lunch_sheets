@@ -78,7 +78,8 @@ function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow)
   let transactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, transactionsLookback).getValues();
 
   let row = transactionAllIds.findIndex(foo => {return foo[0] == id});
-  return row + transactionAllIdsStart
+  if (row == -1) { throw new Error('Didn\'t find transaction id: ' + id); } //TODO: Probably need to fall back to date?
+  return row + transactionAllIdsStart;
 }
 
 function createTransactionsAllSheet() {
@@ -412,9 +413,9 @@ function updatePlaidAccountNames() {
   var plaidAccountNames = {};
   for (const plaidAccount of plaidAccounts) {
     if (plaidAccount.display_name == '' || plaidAccount.display_name == null) {
-      plaidAccount.display_name = plaidAccount.name;
+      plaidAccount.display_name = htmlDecode(plaidAccount.name);
     }
-    plaidAccountNames[plaidAccount.id] = plaidAccount.display_name;
+    plaidAccountNames[plaidAccount.id] = htmlDecode(plaidAccount.display_name);
   }
   try {
     LMDocumentProperties.setProperty('LMPlaidAccountNames', JSON.stringify(plaidAccountNames));
@@ -436,9 +437,9 @@ function updateAssetAccountNames() {
   var assetAccountNames = {};
   for (const asset of assets) {
     if (asset.display_name == '' || asset.display_name == null) {
-      asset.display_name = asset.name;
+      asset.display_name = htmlDecode(asset.name);
     }
-    assetAccountNames[asset.id] = asset.display_name;
+    assetAccountNames[asset.id] = htmlDecode(asset.display_name);
   }
   try {
     LMDocumentProperties.setProperty('LMAssetAccountNames', JSON.stringify(assetAccountNames));
@@ -447,6 +448,11 @@ function updateAssetAccountNames() {
     return false
   }
   return assetAccountNames
+}
+
+function htmlDecode(input) {
+  let decode = XmlService.parse('<d>' + input + '</d>');
+  return decode.getRootElement().getText();
 }
 
 function updateCatagories() {
