@@ -98,7 +98,8 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
   var netWorth = 0;
   var accountsSheet = LMActiveSpreadsheet.getSheetByName('LM-Accounts');
   if (accountsSheet == null) { accountsSheet = createSheet('LM-Accounts'); }
-  var headers = accountsSheet.getRange(1, 1, 1, accountsSheet.getLastColumn()).getValues()[0];
+  // throw new Error('break');
+  var headers = accountsSheet.getRange(2, 1, 1, accountsSheet.getLastColumn()).getValues()[0];
 
   if (LMTrackPlaidAccounts) {
     for (const account of plaidAccounts) {
@@ -126,10 +127,12 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
       let index = headers.indexOf(accountName);
       if ( index == -1 ) {
         index = headers.push(accountName) - 1; //push returns length, we want index which is one less
-        accountsSheet.getRange(1, accountsSheet.getLastColumn()+1).setValue(accountName);
+        accountsSheet.getRange(2, accountsSheet.getLastColumn()+1).setValue(accountName);
         accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+        accountsSheet.getRange(1,index+1).setValue(amount.toFixed(2));
       } else {
         accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+        accountsSheet.getRange(1,index+1).setValue(amount.toFixed(2));
       }
     }
   }
@@ -163,10 +166,12 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
       let index = headers.indexOf(accountName);
       if ( index == -1 ) {
         index = headers.push(accountName) - 1; //push returns length, we want index which is one less
-        accountsSheet.getRange(1, accountsSheet.getLastColumn()+1).setValue(accountName);
+        accountsSheet.getRange(2, accountsSheet.getLastColumn()+1).setValue(accountName);
         accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+        accountsSheet.getRange(1,index+1).setValue(amount.toFixed(2));
       } else {
         accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+        accountsSheet.getRange(1,index+1).setValue(amount.toFixed(2));
       }
     }
   }
@@ -183,6 +188,7 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
     accountsSheet.getRange(row, 1).setValue(today);
   }
   accountsSheet.getRange(row,2).setValue(netWorth.toFixed(2));
+  accountsSheet.getRange(1,2).setValue(netWorth.toFixed(2));
 }
 
 function writeCoalesed(months, days) {
@@ -242,10 +248,15 @@ function writeCoalesed(months, days) {
 }
 
 function findDate(sheet, date) {
-  let dates = sheet.getRange(2, 1, sheet.getLastRow()).getValues();
+  if (sheet.getName() == 'LM-Accounts') {
+    var dates = sheet.getRange(3, 1, sheet.getLastRow()).getValues();
+  } else {
+    var dates = sheet.getRange(2, 1, sheet.getLastRow()).getValues();
+  }
   let row = dates.findIndex(foo => {return foo[0] >= date});
   // if (LMdebug) {Logger.log('findDate row %s', row);}
   if (row == -1) { return -1; }
+  if (sheet.getName() == 'LM-Accounts') { return row+3; }
   return row+2;
 }
 
@@ -253,9 +264,16 @@ function createSheet(name) {
   var sheet = LMActiveSpreadsheet.insertSheet(name);
   if (name == 'LM-Accounts') {
     let headers = ['Date', 'Net Worth']
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(2, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, 1).setValue('Latest');
+    let firstRow = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
+    firstRow.setNumberFormat("$#,##0.00;$(#,##0.00)");
+    let secondRow = sheet.getRange(2, 1, sheet.getMaxRows(), sheet.getMaxColumns());
+    secondRow.setNumberFormat("@");
     let dateCol = sheet.getRange("A1:A");
     dateCol.setNumberFormat("@");
+    let theRest = sheet.getRange(3, 2, sheet.getMaxRows(), sheet.getMaxColumns());
+    theRest.setNumberFormat("$#,##0.00;$(#,##0.00)");
     return sheet
   }
   var LMCategories = JSON.parse(LMDocumentProperties.getProperty('LMCategories'));
