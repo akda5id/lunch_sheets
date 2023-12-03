@@ -15,15 +15,18 @@ const LMdebug = true;           //write tracing info to the apps script log
 
 const LMJumpOnFinish = false;    //should we jump to the last row when we finish updating a sheet?
 
-const LMTransactionsLookbackMonths = 1//number of full months we will pull transactions from, prior to the current one, to check
-                                      //for updated category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
+const LMTransactionsLookbackMonths = 1; //number of full months we will pull transactions from, prior to the current one, to check
+                                        //for updated category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
 
-const LMTransactionsLookback = 1000   //Max number of transactions you would ever get from today to LMTransactionsLookbackMonths.
+const LMTransactionsLookback = 1000;  //Max number of transactions you would ever get from today to LMTransactionsLookbackMonths.
                                       //Be generous, it's fast. Script will error with a warning if it is too small.
 
-const LMCoalesce = true       //Should we total up all categories and tags and write to separate sheet?
-const LMCoalesceMonths = true //if so, by months?
-const LMCoalesceDays = true   //and by days?
+const LMCoalesce = true;       //Should we total up all categories and tags and write to separate sheet?
+const LMCoalesceMonths = true; //if so, by months?
+const LMCoalesceDays = true;   //and by days?
+
+const LMTrackPlaidAccounts = true;   //Track plaid account values?
+const LMTrackAssets = false;         //Track manually updated assets?
 /**
  *  END OF SETTINGS
  */
@@ -32,22 +35,23 @@ const LMDocumentProperties = PropertiesService.getDocumentProperties();
 const LMActiveSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
 function updateTransactionsAll() {
-  var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions-All");
+  var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions");
   if (transactionsAllSheet == null) {
     let firstTransactionDate = '1970-01-01';
     var today = new Date();
     today = Utilities.formatDate(today, "GMT", "yyyy-MM-dd");
     let transactions = loadTransactions(firstTransactionDate, today);
     if (transactions == false) {throw new Error("problem loading transactions");}
-    let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
+    let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
     let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     transactionsAllSheet = createTransactionsAllSheet();
     transactionsAllSheet.getRange(2, 1, parsedTransactions_2d.length, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     if (LMCoalesce) {writeCoalesed(months, days);}
+    if (LMTrackPlaidAccounts || LMTrackAssets) {trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNames);}
   } else {
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
-    let {LMCategories, plaidAccountNames, assetAccountNames} = loadCategoriesAndAccounts();
+    let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
     let {startDate, endDate} = calulateRelativeDates();
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
@@ -64,6 +68,7 @@ function updateTransactionsAll() {
     transactionsAllSheet.getRange(row, 1, transactionsLength, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     transactionsAllSheet.getRange(row+transactionsLength, 1, 50, parsedTransactions_2d[0].length).clear();
     if (LMCoalesce) {writeCoalesed(months, days);}
+    if (LMTrackPlaidAccounts || LMTrackAssets) {trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNames);}
   }
   if (LMJumpOnFinish) {transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));}
 }
@@ -83,14 +88,104 @@ function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow)
 }
 
 function createTransactionsAllSheet() {
-  var transactionsAllSheet = LMActiveSpreadsheet.insertSheet('LM-Transactions-All');
+  var transactionsAllSheet = LMActiveSpreadsheet.insertSheet('LM-Transactions');
   let data = [['id', 'date', 'category name', 'payee', 'amount', 'notes', 'account name', 'tag', 'status', 'exclude from totals', 'exclude from budget', 'is income']]
   transactionsAllSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   return transactionsAllSheet
 }
 
+function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNames) {
+  var netWorth = 0;
+  var accountsSheet = LMActiveSpreadsheet.getSheetByName('LM-Accounts');
+  if (accountsSheet == null) { accountsSheet = createSheet('LM-Accounts'); }
+  var headers = accountsSheet.getRange(1, 1, 1, accountsSheet.getLastColumn()).getValues()[0];
+
+  if (LMTrackPlaidAccounts) {
+    for (const account of plaidAccounts) {
+      let accountName = plaidAccountNames[account.id];
+      var date = new Date(account.balance_last_update);
+      date = Utilities.formatDate(date, "GMT", "yyyy-MM-dd");
+      var row = findDate(accountsSheet, date);
+      if ( row == -1 ) { 
+        row = accountsSheet.getLastRow() + 1;
+        accountsSheet.getRange(row, 1).setValue(date);
+      }
+      if (accountsSheet.getRange(row,1).getValue() != date) {
+        accountsSheet.insertRowBefore(row);
+        accountsSheet.getRange(row, 1).setValue(date);
+      }
+      var amount = +(account.balance);
+      if (account.type == 'credit') {
+        if (amount > 0) {
+          amount = 0 - amount;
+        } else {
+          amount = Math.abs(amount);
+        }
+      }
+      netWorth += amount;
+      let index = headers.indexOf(accountName);
+      if ( index == -1 ) {
+        index = headers.push(accountName) - 1; //push returns length, we want index which is one less
+        accountsSheet.getRange(1, accountsSheet.getLastColumn()+1).setValue(accountName);
+        accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+      } else {
+        accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+      }
+    }
+  }
+
+  if (LMTrackAssets) {
+    for (const account of assetAccounts) {
+      let accountName = assetAccountNames[account.id];
+      if (account.balance_as_of == null) {
+        continue;
+      }
+      var date = new Date(account.balance_as_of);
+      date = Utilities.formatDate(date, "GMT", "yyyy-MM-dd");
+      var row = findDate(accountsSheet, date);
+      if ( row == -1 ) { 
+        row = accountsSheet.getLastRow() + 1;
+        accountsSheet.getRange(row, 1).setValue(date);
+      }
+      if (accountsSheet.getRange(row,1).getValue() != date) {
+        accountsSheet.insertRowBefore(row);
+        accountsSheet.getRange(row, 1).setValue(date);
+      }
+      var amount = +(account.balance);
+      if (account.type_name == 'credit' || account.type_name == 'loan' || account.type_name == 'other liability') {
+        if (amount > 0) {
+          amount = 0 - amount;
+        } else {
+          amount = Math.abs(amount);
+        }
+      }
+      netWorth += amount;
+      let index = headers.indexOf(accountName);
+      if ( index == -1 ) {
+        index = headers.push(accountName) - 1; //push returns length, we want index which is one less
+        accountsSheet.getRange(1, accountsSheet.getLastColumn()+1).setValue(accountName);
+        accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+      } else {
+        accountsSheet.getRange(row,index+1).setValue(amount.toFixed(2));
+      }
+    }
+  }
+
+  var today = new Date();
+  today = Utilities.formatDate(today, "GMT", "yyyy-MM-dd");
+  var row = findDate(accountsSheet, today);
+  if ( row == -1 ) { 
+    row = accountsSheet.getLastRow() + 1;
+    accountsSheet.getRange(row, 1).setValue(today);
+  }
+  if (accountsSheet.getRange(row,1).getValue() != today) {
+    accountsSheet.insertRowBefore(row);
+    accountsSheet.getRange(row, 1).setValue(today);
+  }
+  accountsSheet.getRange(row,2).setValue(netWorth.toFixed(2));
+}
+
 function writeCoalesed(months, days) {
-  if (LMdebug) {Logger.log('months %s', months);}
   if (LMCoalesceMonths) {
     var monthsSheet = LMActiveSpreadsheet.getSheetByName('LM-Months');
     if (monthsSheet == null) { monthsSheet = createSheet('LM-Months'); }
@@ -104,9 +199,7 @@ function writeCoalesed(months, days) {
     for (const month of monthKeys) {
       row += 1;
       monthsSheet.getRange(row,1).setValue(month)
-      if (LMdebug) {Logger.log('month %s', month);}
       for (const [key, value] of Object.entries(months[month])) {
-        if (LMdebug) {Logger.log('key %s, value %s', key, value.toFixed(2));}
         let index = headers.indexOf(key);
         if ( index == -1 ) {
           if (LMdebug) {Logger.log('didn\'t find %s', key);}
@@ -119,7 +212,7 @@ function writeCoalesed(months, days) {
       }
     }
   }
-  if (LMdebug) {Logger.log('days %s', days);}
+
   if (LMCoalesceDays) {
     var daysSheet = LMActiveSpreadsheet.getSheetByName('LM-Days');
     if (daysSheet == null) { daysSheet = createSheet('LM-Days'); }
@@ -133,9 +226,7 @@ function writeCoalesed(months, days) {
     for (const day of daysKeys) {
       row += 1;
       daysSheet.getRange(row,1).setValue(day)
-      if (LMdebug) {Logger.log('day %s', day);}
       for (const [key, value] of Object.entries(days[day])) {
-        if (LMdebug) {Logger.log('key %s, value %s', key, value.toFixed(2));}
         let index = headers.indexOf(key);
         if ( index == -1 ) {
           if (LMdebug) {Logger.log('didn\'t find %s', key);}
@@ -153,13 +244,20 @@ function writeCoalesed(months, days) {
 function findDate(sheet, date) {
   let dates = sheet.getRange(2, 1, sheet.getLastRow()).getValues();
   let row = dates.findIndex(foo => {return foo[0] >= date});
-  if (LMdebug) {Logger.log('findDate row %s', row);}
+  // if (LMdebug) {Logger.log('findDate row %s', row);}
   if (row == -1) { return -1; }
   return row+2;
 }
 
 function createSheet(name) {
   var sheet = LMActiveSpreadsheet.insertSheet(name);
+  if (name == 'LM-Accounts') {
+    let headers = ['Date', 'Net Worth']
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    let dateCol = sheet.getRange("A1:A");
+    dateCol.setNumberFormat("@");
+    return sheet
+  }
   var LMCategories = JSON.parse(LMDocumentProperties.getProperty('LMCategories'));
   LMCategories.sort((a, b) => a.order - b.order);
   var headers = [];
@@ -362,30 +460,40 @@ function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAcc
 }
 
 function loadCategoriesAndAccounts() {
-  try {
-    var plaidAccountNames = JSON.parse(LMDocumentProperties.getProperty('LMPlaidAccountNames'));
-    if (plaidAccountNames == null) {
-      plaidAccountNames = updatePlaidAccountNames()
-      if (plaidAccountNames == false) {
-        throw new Error('failed to load LMPlaidAccountNames 1');
+  if (LMTrackPlaidAccounts) {
+    var {plaidAccountNames, plaidAccounts} = updatePlaidAccounts();
+  } else {
+    try {
+      var plaidAccountNames = JSON.parse(LMDocumentProperties.getProperty('LMPlaidAccountNames'));
+      var plaidAccounts = null;
+      if (plaidAccountNames == null) {
+        var {plaidAccountNames, plaidAccounts} = updatePlaidAccounts()
+        if (plaidAccountNames == false) {
+          throw new Error('failed to load LMPlaidAccountNames 1');
+        }
       }
+    } catch (err) {
+      if (LMdebug) {Logger.log('plaidAccountNames failed with error %s', err.message);}
+      throw new Error('failed to load LMPlaidAccountNames 2');
     }
-  } catch (err) {
-    if (LMdebug) {Logger.log('plaidAccountNames failed with error %s', err.message);}
-    throw new Error('failed to load LMPlaidAccountNames 2');
   }
 
-  try {
-    var assetAccountNames = JSON.parse(LMDocumentProperties.getProperty('LMAssetAccountNames'));
-    if (assetAccountNames == null) {
-      assetAccountNames = updateAssetAccountNames();
-      if (assetAccountNames == false) {
-        throw new Error('failed to load LMAssetAccountNames 1');
+  if (LMTrackAssets) {
+    var {assetAccountNames, assetAccounts} = updateAssetAccounts();
+  } else {
+    try {
+      var assetAccountNames = JSON.parse(LMDocumentProperties.getProperty('LMAssetAccountNames'));
+      var assetAccounts = null;
+      if (assetAccountNames == null) {
+        var {assetAccountNames, assetAccounts} = updateAssetAccounts();
+        if (assetAccountNames == false) {
+          throw new Error('failed to load LMAssetAccountNames 1');
+        }
       }
+    } catch (err) {
+      if (LMdebug) {Logger.log('assetAccountNames failed with error %s', err.message);}
+      throw new Error('failed to load LMAssetAccountNames 2');
     }
-  } catch (err) {
-    if (LMdebug) {Logger.log('assetAccountNames failed with error %s', err.message);}
-    throw new Error('failed to load LMAssetAccountNames 2');
   }
   
   try {
@@ -398,18 +506,17 @@ function loadCategoriesAndAccounts() {
     return false;
   }
 
-  return {LMCategories, plaidAccountNames, assetAccountNames}
+  return {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts};
 
 }
 
-function updatePlaidAccountNames() {
+function updatePlaidAccounts() {
   let url = 'https://dev.lunchmoney.app/v1/plaid_accounts'
   let result = apiRequest(url);
   if (result != false) {
     var plaidAccounts = result.plaid_accounts;
-  } else {
-    return false
-  }
+  } else { throw new Error('api apiRequest failed in updatePlaidAccounts'); }
+
   var plaidAccountNames = {};
   for (const plaidAccount of plaidAccounts) {
     if (plaidAccount.display_name == '' || plaidAccount.display_name == null) {
@@ -417,37 +524,34 @@ function updatePlaidAccountNames() {
     }
     plaidAccountNames[plaidAccount.id] = htmlDecode(plaidAccount.display_name);
   }
-  try {
+
+  if (!LMTrackAssets) {
     LMDocumentProperties.setProperty('LMPlaidAccountNames', JSON.stringify(plaidAccountNames));
-  } catch (err) {
-    if (LMdebug) {Logger.log('Saving LMPlaidAccountNames failed with error %s', err.message);}
-    return false
   }
-  return plaidAccountNames
+
+  return {plaidAccountNames, plaidAccounts};
 }
 
-function updateAssetAccountNames() {
+function updateAssetAccounts() {
   let url = 'https://dev.lunchmoney.app/v1/assets'
   let result = apiRequest(url);
   if (result != false) {
-    var assets = result.assets;
-  } else {
-    return false
-  }
+    var assetAccounts = result.assets;
+  } else { throw new Error('api apiRequest failed in updatePlaidAccounts'); }
+
   var assetAccountNames = {};
-  for (const asset of assets) {
+  for (const asset of assetAccounts) {
     if (asset.display_name == '' || asset.display_name == null) {
       asset.display_name = htmlDecode(asset.name);
     }
     assetAccountNames[asset.id] = htmlDecode(asset.display_name);
   }
-  try {
+
+  if (!LMTrackAssets) {
     LMDocumentProperties.setProperty('LMAssetAccountNames', JSON.stringify(assetAccountNames));
-  } catch (err) {
-    if (LMdebug) {Logger.log('Saving LMAssetAccountNames failed with error %s', err.message);}
-    return false
   }
-  return assetAccountNames
+
+  return {assetAccountNames, assetAccounts};
 }
 
 function htmlDecode(input) {
