@@ -41,7 +41,7 @@ There is a thread on the [Lunch Money Discord](https://discord.com/channels/8423
 ### Random Notes:
 * API key is per spreadsheet, so you can use separate "budgets" if you want, as long as you don't need them in the same spreadsheet.
 * You can re-order columns in the LM-Days and LM-Months sheets as you like (except date, leave that at column A!). LM-Accounts you can reorder all except A and B. You can't re-order LM-Transactions, but you can hide columns.
-* You should make sure the Spreadsheet timezone is set to what you expect. (File -> Settings)
+* You should make sure the spreadsheet timezone is set to what you expect. (File -> Settings)
 
 ### To Do:
 * Expose a way to update Accounts (for name changes and such).

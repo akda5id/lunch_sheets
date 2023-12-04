@@ -35,14 +35,15 @@ const LMWriteRandom = true;   //write an incrementing counter to 'LM-Transaction
 
 const LMDocumentProperties = PropertiesService.getDocumentProperties();
 const LMActiveSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-const LMSpreadsheetTimezone = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+const LMSpreadsheetTimezone = LMActiveSpreadsheet.getSpreadsheetTimeZone();
+const LMScriptTimezone = Session.getScriptTimeZone();
 
 function updateTransactionsAll() {
   var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions");
   if (transactionsAllSheet == null) {
     let firstTransactionDate = '1970-01-01';
     var today = new Date();
-    today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
+    today = Utilities.formatDate(today, LMScriptTimezone, "yyyy-MM-dd");
     let transactions = loadTransactions(firstTransactionDate, today);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
@@ -187,7 +188,7 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
   }
 
   var today = new Date();
-  today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
+  today = Utilities.formatDate(today, LMScriptTimezone, "yyyy-MM-dd");
   var row = findDate(accountsSheet, today);
   if ( row == -1 ) { 
     row = accountsSheet.getLastRow() + 1;
@@ -351,8 +352,8 @@ function calculateRelativeDates() {
   var endDate = new Date();
   startDate.setMonth(startDate.getMonth() - LMTransactionsLookbackMonths, 1);
   endDate.setDate(endDate.getDate() + 2);
-  startDate = Utilities.formatDate(startDate, LMSpreadsheetTimezone, "yyyy-MM-dd");
-  endDate = Utilities.formatDate(endDate, LMSpreadsheetTimezone, "yyyy-MM-dd");
+  startDate = Utilities.formatDate(startDate, LMScriptTimezone, "yyyy-MM-dd");
+  endDate = Utilities.formatDate(endDate, LMScriptTimezone, "yyyy-MM-dd");
   return {startDate, endDate}
 }
 
