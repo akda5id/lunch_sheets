@@ -3,7 +3,7 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 * Import all transactions to a sheet called "LM-Transactions", and update it with new transactions, semi-intelligently.
 * Sum up category and tag totals per day, and per month.
 * Track account totals and net worth over time.
-* A user function to total a category or tag for a date range. (Planned, not started)
+* A user function to total a category or tag for a date range.
 
 ### Install:
 1. Open the sheet you would like to use the tools in. Choose "Apps Script" from the Extensions menu. That will open a code editing page, if you don't have any existing Apps Scripts, it will be an empty function called "myFunction" in a file called Code.gs. Delete that empty function, and copy and paste everything [from Code.js](https://raw.githubusercontent.com/akda5id/lunch_sheets/main/Code.js) in this repo into your Code.gs.
@@ -14,7 +14,7 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 
 ### Usage:
 * Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions. After the first run it will check for updated transactions in the month previous, and add new ones up until today to the end of the sheets.
-* That's all it does for now, more coming!
+* Custom function `CATTOTAL` sums a category (or tag) over months, function call looks like: `LMCATTOTAL(category, startDate, endDate, random)` for example: `=LMCATTOTAL("Travel", "2023-10", "2024-12", 'LM-Transactions'!R1)` 'LM-Transactions'!R1 is an incrementing counter, if LMWriteRandom is true in the settings (see below).
 
 ### Settings:
 In the Lunch Money menu, there is an option to "Update Categories". Run this if you change the name, grouping, or hide from budget, income, etc. of categories. I cache them between runs as I don't expect them to change often, so it's a manual update. Note that if you do adjust them, it will only update for transactions in LookbackMonths (see below). If you want to rerun on all transactions, just delete or rename the LM-\* sheets.
@@ -32,6 +32,8 @@ LMTransactionsLookback: Max number of transactions you would ever get from today
 LMCoalesce\*: If you want to write the various sum up category and tags sheets. Should be self explanatory with the comments there.
 
 LMTrack\*: If you want to track account totals and net worth.
+
+LMWriteRandom: Provides an incrementing counter in `'LM-Transactions'!R1` so that Custom Functions run after you update (Google sheets caches function results). Also fun to see how many updates you have run :)
 
 ### Help:
 There is a thread on the [Lunch Money Discord](https://discord.com/channels/842337014556262411/1176857773925998642), let me know how things are going. If you are not joined to the discord already [here is the signup link](https://discord.gg/vSz6jjZuj8).

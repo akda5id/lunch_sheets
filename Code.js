@@ -27,6 +27,8 @@ const LMCoalesceDays = true;   //and by days?
 
 const LMTrackPlaidAccounts = true;   //Track plaid account values?
 const LMTrackAssets = false;         //Track manually updated assets?
+
+const LMWriteRandom = true;   //write an incrementing counter to 'LM-Transactions'!R1 to use in custom function calls to avoid caching.
 /**
  *  END OF SETTINGS
  */
@@ -67,6 +69,13 @@ function updateTransactionsAll() {
     if (LMdebug) {Logger.log('updateTransactionsAll: overwriting from row: %s', row);}
     transactionsAllSheet.getRange(row, 1, transactionsLength, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     transactionsAllSheet.getRange(row+transactionsLength, 1, 50, parsedTransactions_2d[0].length).clear();
+    if (LMWriteRandom) {
+      let range = transactionsAllSheet.getRange(1, 18, 1, 1);
+      var foo = range.getValue();
+      if (foo == '') { foo = 0; }
+      foo += 1;
+      range.setValue(foo);
+    }
     if (LMCoalesce) {writeCoalesed(months, days);}
     if (LMTrackPlaidAccounts || LMTrackAssets) {trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNames);}
   }
@@ -609,4 +618,34 @@ function setApiKey() {
 
 function displayToastAlert(message) {
   SpreadsheetApp.getActive().toast(message, "⚠️ Alert"); 
+}
+
+/**
+ * Return total for a category or tag over months.
+ *
+ * @param {string} category The category or tag.
+ * @param {string} startDate The start date in YYYY-MM.
+ * @param {string} endDate The end date in YYYY-MM, if in future, will total until last row.
+ * @param {string} random Some random to evade caching. Use 'LM-Transactions'!R1
+ * @return The input multiplied by 2.
+ * @customfunction
+ */
+function LMCATTOTAL(category, startDate, endDate, random) {
+  if (LMdebug) {Logger.log('in LMCATTOTAL cat %s, start %s, end %s, random %s', category, startDate, endDate, random);}
+  var monthsSheet = LMActiveSpreadsheet.getSheetByName('LM-Months');
+  if (monthsSheet == null) { throw new Error('Need LM-Months'); }
+  var headers = monthsSheet.getRange(1, 1, 1, monthsSheet.getLastColumn()).getValues()[0];
+  let index = headers.indexOf(category);
+  if ( index == -1 ) { throw new Error('Can\'t find ' + category); }
+  var startRow = findDate(monthsSheet, startDate);
+  if ( startRow == -1 ) { throw new Error('Can\'t find ' + startDate); }
+  var endRow = findDate(monthsSheet, endDate);
+  if ( endRow == -1 ) { endRow = monthsSheet.getLastRow(); }
+  let foo = monthsSheet.getRange(startRow, index+1, endRow - startRow + 1, 1).getValues();
+  var sum = 0;
+  for (const val of foo) {
+    sum += +(val);
+  }
+  if (LMdebug) {Logger.log('in LMCATTOTAL sum %s', sum);}
+  return sum
 }
