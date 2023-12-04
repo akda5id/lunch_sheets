@@ -1,8 +1,12 @@
 # Lunch (in the) Sheets
 Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmoney.app/?refer=be4tew9v) to Google Sheets.
-* Import all transactions to a sheet called "LM-Transactions", and update it with new transactions, semi-intelligently.
-* Sum up category and tag totals per day, and per month.
-* Track account totals and net worth over time.
+* Import all transactions to a sheet called "LM-Transactions", and update it with new transactions, semi-intelligently.<br>
+  <img width="1000" alt="Transactions Screenshot" src="https://github.com/akda5id/lunch_sheets/assets/11182/bdeb2453-5691-4a9a-974a-34cc2b8d1f9d">
+* Sum up category and tag totals per day, and per month.<br>
+  <img width="1000" alt="Months Screenshot" src="https://github.com/akda5id/lunch_sheets/assets/11182/6cc850ac-bf4f-41bf-8761-29c30f811168">
+* Track account totals and net worth over time.<br>
+  <img width="600" alt="Accounts Screenshot" src="https://github.com/akda5id/lunch_sheets/assets/11182/fd70d0ac-81ae-4006-914a-e5c32e3d91f7">
+
 * A user function to total a category or tag for a date range.
 
 ### Install:
