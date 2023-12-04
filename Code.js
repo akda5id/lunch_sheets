@@ -13,7 +13,7 @@ function onOpen() {
  */
 const LMdebug = true;           //write tracing info to the apps script log
 
-const LMJumpOnFinish = false;    //should we jump to the last row when we finish updating a sheet?
+const LMJumpOnFinish = false;    //should we jump to the last row when we finish updating transactions?
 
 const LMTransactionsLookbackMonths = 1; //number of full months we will pull transactions from, prior to the current one, to check
                                         //for updated category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
@@ -35,13 +35,14 @@ const LMWriteRandom = true;   //write an incrementing counter to 'LM-Transaction
 
 const LMDocumentProperties = PropertiesService.getDocumentProperties();
 const LMActiveSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+const LMSpreadsheetTimezone = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
 
 function updateTransactionsAll() {
   var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions");
   if (transactionsAllSheet == null) {
     let firstTransactionDate = '1970-01-01';
     var today = new Date();
-    today = Utilities.formatDate(today, "GMT", "yyyy-MM-dd");
+    today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
     let transactions = loadTransactions(firstTransactionDate, today);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
@@ -54,7 +55,7 @@ function updateTransactionsAll() {
   } else {
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
-    let {startDate, endDate} = calulateRelativeDates();
+    let {startDate, endDate} = calculateRelativeDates();
     let transactions = loadTransactions(startDate, endDate);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
@@ -114,7 +115,7 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
     for (const account of plaidAccounts) {
       let accountName = plaidAccountNames[account.id];
       var date = new Date(account.balance_last_update);
-      date = Utilities.formatDate(date, "GMT", "yyyy-MM-dd");
+      date = Utilities.formatDate(date, LMSpreadsheetTimezone, "yyyy-MM-dd");
       var row = findDate(accountsSheet, date);
       if ( row == -1 ) { 
         row = accountsSheet.getLastRow() + 1;
@@ -153,7 +154,7 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
         continue;
       }
       var date = new Date(account.balance_as_of);
-      date = Utilities.formatDate(date, "GMT", "yyyy-MM-dd");
+      date = Utilities.formatDate(date, LMSpreadsheetTimezone, "yyyy-MM-dd");
       var row = findDate(accountsSheet, date);
       if ( row == -1 ) { 
         row = accountsSheet.getLastRow() + 1;
@@ -186,7 +187,7 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
   }
 
   var today = new Date();
-  today = Utilities.formatDate(today, "GMT", "yyyy-MM-dd");
+  today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
   var row = findDate(accountsSheet, today);
   if ( row == -1 ) { 
     row = accountsSheet.getLastRow() + 1;
@@ -345,13 +346,13 @@ function apiRequest(url) {
   }
 }
 
-function calulateRelativeDates() {
+function calculateRelativeDates() {
   var startDate = new Date();
   var endDate = new Date();
   startDate.setMonth(startDate.getMonth() - LMTransactionsLookbackMonths, 1);
   endDate.setDate(endDate.getDate() + 2);
-  startDate = Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd");
-  endDate = Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd");
+  startDate = Utilities.formatDate(startDate, LMSpreadsheetTimezone, "yyyy-MM-dd");
+  endDate = Utilities.formatDate(endDate, LMSpreadsheetTimezone, "yyyy-MM-dd");
   return {startDate, endDate}
 }
 
