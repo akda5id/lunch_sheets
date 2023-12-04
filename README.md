@@ -14,7 +14,7 @@ Some Apps Script tooling to bring your data from [Lunch Money](https://lunchmone
 
 ### Usage:
 * Choose "Load Transactions" from the Lunch Money menu to load your transactions. On first run it will get all transactions. After the first run it will check for updated transactions in the month previous, and add new ones up until today to the end of the sheets.
-* Custom function `CATTOTAL` sums a category (or tag) over months, function call looks like: `LMCATTOTAL(category, startDate, endDate, random)` for example: `=LMCATTOTAL("Travel", "2023-10", "2024-12", 'LM-Transactions'!R1)` 'LM-Transactions'!R1 is an incrementing counter, if LMWriteRandom is true in the settings (see below).
+* Custom function `CATTOTAL` sums a category (or tag) over months, function call looks like: `LMCATTOTAL(category, startDate, endDate, random)` for example: `=LMCATTOTAL("Travel", "2023-10", "2024-12", 'LM-Transactions'!R1)` 'LM-Transactions'!R1 is an incrementing counter, if LMWriteRandom is true in the settings (see below). Google sheets custom functions are quite slow, so recommend you don't use too much of this. You can run your own SUM's over ranges in the Months sheet, which will be much faster.
 
 ### Settings:
 In the Lunch Money menu, there is an option to "Update Categories". Run this if you change the name, grouping, or hide from budget, income, etc. of categories. I cache them between runs as I don't expect them to change often, so it's a manual update. Note that if you do adjust them, it will only update for transactions in LookbackMonths (see below). If you want to rerun on all transactions, just delete or rename the LM-\* sheets.
@@ -45,7 +45,7 @@ There is a thread on the [Lunch Money Discord](https://discord.com/channels/8423
 ### To Do:
 * Expose a way to update Accounts (for name changes and such).
 * Better error handling and edge case detection. It's working for me now, but I expect to find places where it breaks as I use it more, and hear about many more as other people start using it.
-* Implement the rest of the planned features :)
+* Perhaps add functionality to `LMCATTOTAL` such as working by days also.
 
 ### Security and Privacy Notes:
 This script is read only on Lunch Money, as you can see in apiRequest, method is hard coded to 'get'. Hopefully one day Jen creates read only API keys so you can enforce that on your scripts that way.
