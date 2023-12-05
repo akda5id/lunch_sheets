@@ -43,7 +43,7 @@ function updateTransactionsAll() {
   if (transactionsAllSheet == null) {
     let firstTransactionDate = '1970-01-01';
     var today = new Date();
-    today = Utilities.formatDate(today, LMScriptTimezone, "yyyy-MM-dd");
+    today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
     let transactions = loadTransactions(firstTransactionDate, today);
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
@@ -109,7 +109,6 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
   var netWorth = 0;
   var accountsSheet = LMActiveSpreadsheet.getSheetByName('LM-Accounts');
   if (accountsSheet == null) { accountsSheet = createSheet('LM-Accounts'); }
-  // throw new Error('break');
   var headers = accountsSheet.getRange(2, 1, 1, accountsSheet.getLastColumn()).getValues()[0];
 
   if (LMTrackPlaidAccounts) {
@@ -188,7 +187,7 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
   }
 
   var today = new Date();
-  today = Utilities.formatDate(today, LMScriptTimezone, "yyyy-MM-dd");
+  today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
   var row = findDate(accountsSheet, today);
   if ( row == -1 ) { 
     row = accountsSheet.getLastRow() + 1;
