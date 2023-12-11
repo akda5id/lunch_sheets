@@ -11,24 +11,27 @@ function onOpen() {
 /**
  *  SETTINGS:
  */
-const LMdebug = true;           //write tracing info to the apps script log
+const LMdebug = true;           //Write tracing info to the apps script log
 
-const LMJumpOnFinish = false;    //should we jump to the last row when we finish updating transactions?
+const LMJumpOnFinish = false;    //Should we jump to the last row when we finish updating transactions?
 
-const LMTransactionsLookbackMonths = 1; //number of full months we will pull transactions from, prior to the current one, to check
+const LMTransactionsLookbackMonths = 1; //Number of full months we will pull transactions from, prior to the current one, to check
                                         //for updated category, etc. This one you should keep tight if you can, to reduce load on Lunch Money.
 
 const LMTransactionsLookback = 1000;  //Max number of transactions you would ever get from today to LMTransactionsLookbackMonths.
                                       //Be generous, it's fast. Script will error with a warning if it is too small.
 
 const LMCoalesce = true;       //Should we total up all categories and tags and write to separate sheet?
-const LMCoalesceMonths = true; //if so, by months?
-const LMCoalesceDays = true;   //and by days?
+const LMCoalesceMonths = true; //If so, by months?
+const LMCoalesceDays = false;   //And by days?
 
 const LMTrackPlaidAccounts = true;   //Track plaid account values?
 const LMTrackAssets = false;         //Track manually updated assets?
 
-const LMWriteRandom = true;   //write an incrementing counter to 'LM-Transactions'!R1 to use in custom function calls to avoid caching.
+const LMWriteRandom = true;   //Write an incrementing counter to 'LM-Transactions'!R1 to use in custom function calls to avoid caching.
+
+const LMTransactionsUpdateOnly = false;  //A special debug sheet that doesn't remove pending transactions. Runs very slow, don't
+                                        //turn this on unless you need it.
 /**
  *  END OF SETTINGS
  */
@@ -51,8 +54,16 @@ function updateTransactionsAll() {
     transactionsAllSheet = createTransactionsAllSheet();
     transactionsAllSheet.getRange(2, 1, parsedTransactions_2d.length, parsedTransactions_2d[0].length).setValues(parsedTransactions_2d);
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
+    if (LMWriteRandom) {
+      let range = transactionsAllSheet.getRange(1, 18, 1, 1);
+      var foo = range.getValue();
+      if (foo == '') { foo = 0; }
+      foo += 1;
+      range.setValue(foo);
+    }
     if (LMCoalesce) {writeCoalesed(months, days);}
     if (LMTrackPlaidAccounts || LMTrackAssets) {trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNames);}
+    if (LMTransactionsUpdateOnly) {transactionsUpdateOnly(parsedTransactions_2d);}
   } else {
     var transactionsAllLastRow = transactionsAllSheet.getLastRow();
     let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
@@ -61,6 +72,7 @@ function updateTransactionsAll() {
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     let row = findIdTransactionsAll(parsedTransactions_2d[0][0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
+    if (row < 0) { throw new Error('Didn\'t find transaction id: ' + id); }
     let transactionsLength = parsedTransactions_2d.length;
     if (transactionsLength >= LMTransactionsLookback) {throw new Error('CAUTION! LMTransactionsLookback is not large enough!');}
     if (transactionsAllSheet.getMaxRows() < row+transactionsLength+60) {
@@ -80,8 +92,24 @@ function updateTransactionsAll() {
     }
     if (LMCoalesce) {writeCoalesed(months, days);}
     if (LMTrackPlaidAccounts || LMTrackAssets) {trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNames);}
+    if (LMTransactionsUpdateOnly) {transactionsUpdateOnly(parsedTransactions_2d);}
   }
   if (LMJumpOnFinish) {transactionsAllSheet.setActiveCell(transactionsAllSheet.getDataRange().offset(transactionsAllLastRow, 0, 1, 1));}
+}
+
+function transactionsUpdateOnly(parsedTransactions_2d) {
+  var transactionsAllSheet = LMActiveSpreadsheet.getSheetByName("LM-Transactions-Update");
+  if (transactionsAllSheet == null) { transactionsAllSheet = createTransactionsAllSheet('LM-Transactions-Update'); }
+  var transactionsAllLastRow = transactionsAllSheet.getLastRow();
+  for (const transaction of parsedTransactions_2d) {
+    let row = findIdTransactionsAll(transaction[0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
+    if (row > 0) {
+       transactionsAllSheet.getRange(row, 1, 1, transaction.length).setValues([transaction]);
+    } else {
+      transactionsAllLastRow = transactionsAllLastRow + 1;
+      transactionsAllSheet.getRange(transactionsAllLastRow, 1, 1, transaction.length).setValues([transaction]);
+    }
+  }
 }
 
 function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow){
@@ -94,12 +122,12 @@ function findIdTransactionsAll(id, transactionsAllSheet, transactionsAllLastRow)
   let transactionAllIds = transactionsAllSheet.getRange(transactionAllIdsStart, 1, transactionsLookback).getValues();
 
   let row = transactionAllIds.findIndex(foo => {return foo[0] == id});
-  if (row == -1) { throw new Error('Didn\'t find transaction id: ' + id); } //TODO: Probably need to fall back to date?
+  if (row == -1) { return -1; } //TODO: Probably need to fall back to date?
   return row + transactionAllIdsStart;
 }
 
-function createTransactionsAllSheet() {
-  var transactionsAllSheet = LMActiveSpreadsheet.insertSheet('LM-Transactions');
+function createTransactionsAllSheet(name = 'LM-Transactions') {
+  var transactionsAllSheet = LMActiveSpreadsheet.insertSheet(name);
   let data = [['id', 'date', 'category name', 'payee', 'amount', 'notes', 'account name', 'tag', 'status', 'exclude from totals', 'exclude from budget', 'is income']]
   transactionsAllSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   return transactionsAllSheet
