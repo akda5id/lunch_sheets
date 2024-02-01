@@ -426,6 +426,10 @@ function parseTransactions(transactions, LMCategories, plaidAccountNames, assetA
   var days = {};
 
   for (const transaction of transactions) {
+    if (transaction.has_children) {
+      continue;
+    }
+
     let parsedTransaction = parseTransaction(transaction, LMCategories, plaidAccountNames, assetAccountNames);
 
     if (LMCoalesce && !parsedTransaction.exclude_from_budget) {
