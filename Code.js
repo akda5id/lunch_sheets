@@ -72,7 +72,7 @@ function updateTransactionsAll() {
     if (transactions == false) {throw new Error("problem loading transactions");}
     let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     let row = findIdTransactionsAll(parsedTransactions_2d[0][0].toFixed(0), transactionsAllSheet, transactionsAllLastRow);
-    if (row < 0) { throw new Error('Didn\'t find transaction id: ' + id); }
+    if (row < 0) { throw new Error('Didn\'t find transaction id: ' + parsedTransactions_2d[0][0].toFixed(0)); }
     let transactionsLength = parsedTransactions_2d.length;
     if (transactionsLength >= LMTransactionsLookback) {throw new Error('CAUTION! LMTransactionsLookback is not large enough!');}
     if (transactionsAllSheet.getMaxRows() < row+transactionsLength+60) {
