@@ -47,8 +47,7 @@ function updateTransactionsAll() {
     let firstTransactionDate = '1970-01-01';
     var today = new Date();
     today = Utilities.formatDate(today, LMSpreadsheetTimezone, "yyyy-MM-dd");
-    let transactions = loadTransactions(firstTransactionDate, today);
-    if (transactions == false) {throw new Error("problem loading transactions");}
+    let transactions = loadTransactionsPaginated(firstTransactionDate, today);
     let {LMCategories, plaidAccountNames, assetAccountNames, plaidAccounts, assetAccounts} = loadCategoriesAndAccounts();
     let {parsedTransactions_2d, months, days} = parseTransactions(transactions, LMCategories, plaidAccountNames, assetAccountNames);
     transactionsAllSheet = createTransactionsAllSheet();
@@ -390,6 +389,10 @@ function loadTransactions(startDate, endDate) {
   try{
     if (result != false) {
       if (result.transactions.length > 0) {
+        if (result.has_more) {
+          if (LMdebug) {Logger.log('loadTransactions returned more for %s', url);}
+          throw new Error('loadTransactions returned more for ' + url);
+        }
         return result.transactions;
       } else {
         if (LMdebug) {Logger.log('loadTransactions empty for %s', url);}
@@ -405,6 +408,56 @@ function loadTransactions(startDate, endDate) {
     displayToastAlert("unable to retrieve transactions");
     return false
   }
+}
+
+function colateTransactions(transactions, new_transactions) {
+    for (const transaction of new_transactions) {
+        const insertionIndex = transactions.findIndex(t => t.date > transaction.date);
+
+        if (insertionIndex === -1) {
+            transactions.push(transaction);
+        } else {
+            transactions.splice(insertionIndex, 0, transaction);
+        }
+    }
+}
+
+function loadTransactionsWithOffset(startDate, endDate, offset = 0) {
+    let url = 'https://dev.lunchmoney.app/v1/transactions?&is_group=false&debit_as_negative=true&pending=true&limit=1000&start_date=' + startDate + '&end_date=' + endDate + '&offset=' + offset;
+    let result = apiRequest(url);
+    try {
+        if (result != false) {
+            if (result.transactions.length > 0) {
+                return {
+                    transactions: result.transactions,
+                    has_more: result.has_more
+                };
+            } else {
+                if (LMdebug) { Logger.log('loadTransactions empty for %s', url); }
+                throw new Error('loadTransactions empty for ' + url);
+            }
+        } else {
+            throw new Error('loadTransactions failed for ' + url);
+        }
+    } catch (err) {
+        if (LMdebug) { Logger.log('result %s', result); }
+        if (LMdebug) { Logger.log('loadTransactions failed with error %s', err.message); }
+        throw new Error('loadTransactions failed with error ' + err.message + ' for ' + url);
+    }
+}
+
+function loadTransactionsPaginated(startDate, endDate) {
+    let offset = 0;
+    let result = loadTransactionsWithOffset(startDate, endDate, offset);
+    let transactions = result ? result.transactions : [];
+    let has_more = result ? result.has_more : false;
+    while (has_more) {
+        offset += 1000;
+        result = loadTransactionsWithOffset(startDate, endDate, offset);
+        colateTransactions(transactions, result.transactions);
+        has_more = result.has_more;
+    }
+    return transactions;
 }
 
 function coalesce(object, period, parsedTransaction, name) {
