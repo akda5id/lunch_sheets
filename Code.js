@@ -140,6 +140,9 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
 
   if (LMTrackPlaidAccounts) {
     for (const account of plaidAccounts) {
+      if (account.status === 'inactive') {
+        continue;
+      }
       let accountName = plaidAccountNames[account.id];
       var date = new Date(account.balance_last_update);
       date = Utilities.formatDate(date, LMSpreadsheetTimezone, "yyyy-MM-dd");
