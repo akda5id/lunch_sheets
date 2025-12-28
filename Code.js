@@ -550,12 +550,12 @@ function parseTransaction(transaction, LMCategories, plaidAccountNames, assetAcc
   //account name
   if (transaction.hasOwnProperty('asset_id') && transaction.asset_id !== null) {
     if (!assetAccountNames.hasOwnProperty(transaction.asset_id)) {
-      assetAccountNames = updateAssetAccountNames();
+      assetAccountNames = updateAssetAccounts().assetAccountNames;
     }
     transaction.account_name = assetAccountNames[transaction.asset_id];
   } else if (transaction.hasOwnProperty('plaid_account_id') && transaction.plaid_account_id !== null) {
     if (!plaidAccountNames.hasOwnProperty(transaction.plaid_account_id)) {
-      plaidAccountNames = updatePlaidAccountNames();
+      plaidAccountNames = updatePlaidAccounts().plaidAccountNames;
     }
     transaction.account_name = plaidAccountNames[transaction.plaid_account_id];
   } else {
