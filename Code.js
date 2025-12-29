@@ -140,9 +140,6 @@ function trackNW(plaidAccounts, plaidAccountNames, assetAccounts, assetAccountNa
 
   if (LMTrackPlaidAccounts) {
     for (const account of plaidAccounts) {
-      if (account.status === 'inactive') {
-        continue;
-      }
       let accountName = plaidAccountNames[account.id];
       var date = new Date(account.balance_last_update);
       date = Utilities.formatDate(date, LMSpreadsheetTimezone, "yyyy-MM-dd");
@@ -632,6 +629,9 @@ function updatePlaidAccounts() {
   if (result != false) {
     var plaidAccounts = result.plaid_accounts;
   } else { throw new Error('api apiRequest failed in updatePlaidAccounts'); }
+
+  // Filter out inactive accounts
+  plaidAccounts = plaidAccounts.filter(account => account.status !== 'inactive');
 
   var plaidAccountNames = {};
   for (const plaidAccount of plaidAccounts) {
